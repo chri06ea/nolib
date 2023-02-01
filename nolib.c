@@ -727,8 +727,8 @@ int main(int argc, const char** argv)
 
 	dcheck(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
 	dcheck(wglMakeCurrent(device_context, rendering_context));
-
-	wglSwapIntervalEXT(false);
+	
+	disable_vsync();
 
 	ShowWindow(window_handle, SW_SHOW);
 
@@ -877,8 +877,8 @@ int main(int argc, const char** argv)
 
 		if(time - last_printf_time > 1.f)
 		{
-			const float avg_fps = (f32) frame_count / time;
-			const float avg_simulations = (f32) simulation_count / time;
+			const float avg_fps = frame_count / time;
+			const float avg_simulations = simulation_count / time;
 
 			TRACE("Simulation count %I64d Frame count %I64d Time %0.2f Avg FPS %0.2f, Avg simulations %0.2f\n", simulation_count, frame_count, time, avg_fps, avg_simulations);
 
@@ -887,4 +887,9 @@ int main(int argc, const char** argv)
 
 		num_sprite_vertices = 0, num_sprite_indices = 0;
 	}
+}
+
+void disable_vsync()
+{
+	dcheck(wglSwapIntervalEXT(false));
 }
