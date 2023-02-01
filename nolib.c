@@ -181,7 +181,7 @@ nil(__stdcall* glEnableVertexAttribArray)(u32 index);
 nil(__stdcall* glVertexAttribPointer)(u32 index, i32 size, u32 type, u8 normalized, i32 stride, const void* pointer);
 nil(__stdcall* glGenTextures)(i32 n, u32* textures);
 nil(__stdcall* glBindTexture)(u32 target, u32 _atlas_texture);
-nil(__stdcall* glTexParameteri)(u32 target, u32 pname, const i32* params);
+nil(__stdcall* glTexParameteri)(u32 target, u32 pname,u32 params);
 nil(__stdcall* glTexImage2D)(u32 target, i32 level, i32 internalformat, i32 width, i32 height, i32 border, u32 format, u32 type, const void* pixels);
 nil(__stdcall* glGenerateMipmap)(u32 target);
 nil(__stdcall* glDrawElements)(u32 mode, i32 count, u32 type, const void* indices);
@@ -258,14 +258,15 @@ u32 compile_shader(const char* shader_source, const char* shader_type)
 	if(!compilation_status)
 	{
 		gl_assert(glGetShaderInfoLog(shader, 512, NULL, compilation_log));
-		assert(false, compilation_log);
+		assert(false);
 	};
 	return shader;
 }
 
-void setup_vertex_attributes(u32 shader, ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
+void setup_vertex_attributes(u32 shader, const ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
 {
-	u32 stride = 0, offset = 0, index = 0;
+	u32 stride = 0, index = 0;
+	u8* offset = 0;
 
 	for(size_t i = 0; i < MAX_SHADER_ATTRIBUTES; i++)
 	{
@@ -305,7 +306,7 @@ u8 use_shader(u32 shader)
 }
 
 
-u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_source, ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
+u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_source, const ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
 {
 	u32 fragment_shader = compile_shader(vertex_shader_source, "vertex");
 	u32 vertex_shader = compile_shader(fragment_shader_source, "fragment");
@@ -321,7 +322,7 @@ u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_
 	if(!compilation_status)
 	{
 		gl_assert(glGetProgramInfoLog(program, 512, NULL, compilation_log));
-		assert(false, compilation_log);
+		assert(false);
 	}
 	// delete the shaders as they're linked into our program now and no longer necessary
 	gl_assert(glDeleteShader(vertex_shader));
@@ -373,7 +374,7 @@ u32 create_texture(u32 texture_id)
 {
 	u32 texture;
 
-	const void* data;
+	void* data;
 	u32 width, height, num_channels;
 	assert(load_texture(texture_id, &data, &width, &height, &num_channels));
 
@@ -433,7 +434,7 @@ void write_vertex_buffer(u32 vbo, const void* data, uintptr data_size)
 	gl_assert(glBufferSubData(GL_ARRAY_BUFFER, 0, data_size, data));
 }
 
-void draw_triangles(u32 index_count)
+void draw_triangles(i32 index_count)
 {
 	gl_assert(glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0));
 }
@@ -490,7 +491,7 @@ SpriteVertex sprite_vertices[MAX_SPRITE_VERTICES];
 i64 num_sprite_vertices = 0;
 
 u32 sprite_indices[MAX_SPRITE_INDICES];
-i64 num_sprite_indices = 0;
+i32 num_sprite_indices = 0;
 
 u32 window_width = WINDOW_DEFAULT_WIDTH, window_height = WINDOW_DEFAULT_HEIGHT;
 u32 world_width = WINDOW_DEFAULT_WIDTH, world_height = WINDOW_DEFAULT_HEIGHT;
@@ -500,10 +501,10 @@ u64 entity_flags[MAX_ENTITIES];
 v3f entity_positions[MAX_ENTITIES];
 
 f32 vertices[MAX_SPRITE_VERTICES];
-i64 num_vertices;
+u32 num_vertices;
 
 u32 indices[MAX_SPRITE_VERTICES];
-i64 max_vertices;
+u32 max_vertices;
 
 #define SIMULATIONS_PER_SECOND 128
 #define SIMULATION_TIME_INTERVAL (1.f / (f32)SIMULATIONS_PER_SECOND)
@@ -516,7 +517,7 @@ inline u8 screen_to_ndc_v2f(const v2f* screen_pos, v2f* ndc_pos)
 	return true;
 }
 
-inline u8 world_to_ndc_v2f(const v2f* world_pos, v2f* ndc_pos)
+inline u8 world_to_ndc_v2f(const v3f* world_pos, v2f* ndc_pos)
 {
 	ndc_pos->x = ((world_pos->x / world_width) * 2) - 1.f;
 	ndc_pos->y = ((world_pos->y / world_height) * 2) - 1.f;
@@ -588,7 +589,6 @@ int main(int argc, const char** argv)
 	f32 time;
 	f32 time_since_simulation;
 	f32 last_simulation_time = -1.f;
-	f32 fps;
 	u64 simulation_count = 0;
 	u64 frame_count = 0;
 	f32 last_printf_time = 0.f;
