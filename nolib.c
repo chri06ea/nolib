@@ -3,14 +3,18 @@
 #include <stdio.h>
 #include <assert.h>
 
-
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #pragma comment(lib, "opengl32.lib")
 
 #define TRACE(fmt, ...) printf(fmt, __VA_ARGS__);
+
+#ifdef _DEBUG
+#define dcheck(x) assert(x)
+#else
 #define dcheck(x) x
+#endif
 
 typedef float f32;
 typedef unsigned char u8;
