@@ -590,7 +590,7 @@ extern "C"
 
 #ifndef STBI_ASSERT
 #include <assert.h>
-#define STBI_ASSERT(x) dcheck(x)
+#define STBI_ASSERT(x) assert(x)
 #endif
 
 #ifdef __cplusplus
