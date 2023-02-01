@@ -1,0 +1,9 @@
+# Build folder
+
+/build/*
+*/x64/*
+*debug/
+
+/.vs/
+/ignore/
+/enc_temp_folder/
