@@ -181,7 +181,7 @@ nil(__stdcall* glEnableVertexAttribArray)(u32 index);
 nil(__stdcall* glVertexAttribPointer)(u32 index, i32 size, u32 type, u8 normalized, i32 stride, const void* pointer);
 nil(__stdcall* glGenTextures)(i32 n, u32* textures);
 nil(__stdcall* glBindTexture)(u32 target, u32 _atlas_texture);
-nil(__stdcall* glTexParameteri)(u32 target, u32 pname,u32 params);
+nil(__stdcall* glTexParameteri)(u32 target, u32 pname, u32 params);
 nil(__stdcall* glTexImage2D)(u32 target, i32 level, i32 internalformat, i32 width, i32 height, i32 border, u32 format, u32 type, const void* pixels);
 nil(__stdcall* glGenerateMipmap)(u32 target);
 nil(__stdcall* glDrawElements)(u32 mode, i32 count, u32 type, const void* indices);
@@ -506,8 +506,9 @@ u32 num_vertices;
 u32 indices[MAX_SPRITE_VERTICES];
 u32 max_vertices;
 
-#define SIMULATIONS_PER_SECOND 128
+#define SIMULATIONS_PER_SECOND 64
 #define SIMULATION_TIME_INTERVAL (1.f / (f32)SIMULATIONS_PER_SECOND)
+#define RENDER_TIME_INTERVAL SIMULATION_TIME_INTERVAL
 
 inline u8 screen_to_ndc_v2f(const v2f* screen_pos, v2f* ndc_pos)
 {
@@ -589,6 +590,8 @@ int main(int argc, const char** argv)
 	f32 time;
 	f32 time_since_simulation;
 	f32 last_simulation_time = -1.f;
+	f32 time_since_render;
+	f32 last_render_time = -1.f;
 	u64 simulation_count = 0;
 	u64 frame_count = 0;
 	f32 last_printf_time = 0.f;
@@ -721,7 +724,7 @@ int main(int argc, const char** argv)
 	assert(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
 	assert(wglMakeCurrent(device_context, rendering_context));
 
-	//wglSwapIntervalEXT(true);
+	wglSwapIntervalEXT(false);
 
 	ShowWindow(window_handle, SW_SHOW);
 
@@ -764,11 +767,11 @@ int main(int argc, const char** argv)
 
 		assert(tick_count = get_tick_count());
 
-		time = ((f32) tick_count - (f32) start_tick_count) / (f32) ticks_per_second;
+		time = (f32) (tick_count - start_tick_count) / (f32) ticks_per_second;
 
 		time_since_simulation = time - last_simulation_time;
 
-		if(time_since_simulation > SIMULATION_TIME_INTERVAL)
+		if(time_since_simulation >= SIMULATION_TIME_INTERVAL)
 		{
 			for(u64 entity = 0; entity < entity_count; entity++)
 			{
@@ -784,44 +787,13 @@ int main(int argc, const char** argv)
 			last_simulation_time = time;
 		}
 
+		time_since_render = time - last_render_time;
+
+		if(time_since_render >= RENDER_TIME_INTERVAL)
 		{
-			SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
-			sprite_vertex->position = TOP_LEFT_NDC_V2F;
-			sprite_vertex->texture_pos = TOP_LEFT_TEX_V2F;
-			sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-			sprite_vertex->color = WHITE;
-
-			sprite_vertex++;
-
-			sprite_vertex->position = TOP_RIGHT_NDC_V2F;
-			sprite_vertex->texture_pos = TOP_RIGHT_TEX_V2F;
-			sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-			sprite_vertex->color = WHITE;
-
-			sprite_vertex++;
-
-			sprite_vertex->position = BOT_LEFT_NDC_V2F;
-			sprite_vertex->texture_pos = BOT_LEFT_TEX_V2F;
-			sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-			sprite_vertex->color = WHITE;
-
-			sprite_vertex++;
-
-			sprite_vertex->position = BOT_RIGHT_NDC_V2F;
-			sprite_vertex->texture_pos = BOT_RIGHT_TEX_V2F;
-			sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-			sprite_vertex->color = WHITE;
-
-			num_sprite_vertices += VERTICES_PER_SPRITE;
-			num_sprite_indices += INDICES_PER_SPRITE;
-		}
-
-		for(u64 entity = 0; entity < entity_count; entity++)
-		{
-			if(entity_flags[entity] & HAS_TEXTURE && entity_flags[entity] & HAS_POSITION)
 			{
 				SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
-				assert(world_to_ndc_v2f(&entity_positions[entity], &sprite_vertex->position));
+				sprite_vertex->position = TOP_LEFT_NDC_V2F;
 				sprite_vertex->texture_pos = TOP_LEFT_TEX_V2F;
 				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 				sprite_vertex->color = WHITE;
@@ -850,23 +822,63 @@ int main(int argc, const char** argv)
 				num_sprite_vertices += VERTICES_PER_SPRITE;
 				num_sprite_indices += INDICES_PER_SPRITE;
 			}
+
+			for(u64 entity = 0; entity < entity_count; entity++)
+			{
+				if(entity_flags[entity] & HAS_TEXTURE && entity_flags[entity] & HAS_POSITION)
+				{
+					SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
+					assert(world_to_ndc_v2f(&entity_positions[entity], &sprite_vertex->position));
+					sprite_vertex->texture_pos = TOP_LEFT_TEX_V2F;
+					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+					sprite_vertex->color = WHITE;
+
+					sprite_vertex++;
+
+					sprite_vertex->position = TOP_RIGHT_NDC_V2F;
+					sprite_vertex->texture_pos = TOP_RIGHT_TEX_V2F;
+					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+					sprite_vertex->color = WHITE;
+
+					sprite_vertex++;
+
+					sprite_vertex->position = BOT_LEFT_NDC_V2F;
+					sprite_vertex->texture_pos = BOT_LEFT_TEX_V2F;
+					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+					sprite_vertex->color = WHITE;
+
+					sprite_vertex++;
+
+					sprite_vertex->position = BOT_RIGHT_NDC_V2F;
+					sprite_vertex->texture_pos = BOT_RIGHT_TEX_V2F;
+					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+					sprite_vertex->color = WHITE;
+
+					num_sprite_vertices += VERTICES_PER_SPRITE;
+					num_sprite_indices += INDICES_PER_SPRITE;
+				}
+			}
+
+			clear_background();
+
+			write_vertex_buffer(sprite_vertex_buffer, sprite_vertices, num_sprite_vertices * sizeof(SpriteVertex));
+
+			draw_triangles(num_sprite_indices);
+
+			SwapBuffers(device_context);
+
+			frame_count++;
+			last_render_time = time;
 		}
-
-		clear_background();
-
-		write_vertex_buffer(sprite_vertex_buffer, sprite_vertices, num_sprite_vertices * sizeof(SpriteVertex));
-
-		draw_triangles(num_sprite_indices);
-
-		SwapBuffers(device_context);
-
-		frame_count++;
 
 		if(time - last_printf_time > 1.f)
 		{
-			const float avg_fps = (f32) frame_count / time;
+			static u32 framecount_last = 0;
 
-			TRACE("Simulation count %I64d Frame count %I64d Time %0.2f FPS %0.2f\n", simulation_count, frame_count, time, avg_fps);
+			const float avg_fps = (f32) frame_count / time;
+			const float avg_simulations = (f32) simulation_count / time;
+
+			TRACE("Simulation count %I64d Frame count %I64d Time %0.2f Avg FPS %0.2f, Avg simulations %0.2f\n", simulation_count, frame_count, time, avg_fps, avg_simulations);
 
 			last_printf_time = time;
 		}
