@@ -1,9 +1,15 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <assert.h>
 #include <stdio.h>
+#include <assert.h>
+//#define assert(x) x
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #pragma comment(lib, "opengl32.lib")
+
+#define TRACE(fmt, ...) printf(fmt, __VA_ARGS__);
 
 typedef float f32;
 typedef unsigned char u8;
@@ -97,6 +103,7 @@ static_assert(INDICES_PER_SPRITE% MAX_SPRITE_INDICES == 0, "Unaligned index  buf
 HGLRC(__stdcall* wglCreateContextAttribsARB)(HDC hdc, HGLRC hShareContext, const int* attribList);
 BOOL(__stdcall* wglChoosePixelFormatARB)(HDC hdc, const int* piAttribIList, const FLOAT* pfAttribFList, UINT nMaxFormats, int* piFormats, UINT* nNumFormats);
 void* (__stdcall* wglGetProcAddress2)(LPCSTR name);
+void* (__stdcall* wglSwapIntervalEXT)(u8 vsync);
 
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
@@ -186,6 +193,7 @@ u32(__stdcall* glGetError)();
 
 int _t_gl_error = 0;
 #define gl_assert(x) x; if((_t_gl_error = glGetError()) != 0) { printf("gl_assert: %d\n", _t_gl_error); __debugbreak(); }
+
 
 typedef struct {
 	u32 type;
@@ -326,8 +334,6 @@ u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_
 
 #define TEXTURE_WALL 1
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 
 u8 load_texture(u32 texture_id, const void** data, u32* width, u32* height, u32* num_channels)
 {
@@ -499,6 +505,9 @@ i64 num_vertices;
 u32 indices[MAX_SPRITE_VERTICES];
 i64 max_vertices;
 
+#define SIMULATIONS_PER_SECOND 128
+#define SIMULATION_TIME_INTERVAL (1.f / (f32)SIMULATIONS_PER_SECOND)
+
 inline u8 screen_to_ndc_v2f(const v2f* screen_pos, v2f* ndc_pos)
 {
 	ndc_pos->x = ((screen_pos->x / window_width) * 2) - 1.f;
@@ -513,6 +522,24 @@ inline u8 world_to_ndc_v2f(const v2f* world_pos, v2f* ndc_pos)
 	ndc_pos->y = ((world_pos->y / world_height) * 2) - 1.f;
 
 	return true;
+}
+
+inline u64 get_tick_count()
+{
+	LARGE_INTEGER li;
+
+	assert(QueryPerformanceCounter(&li));
+
+	return li.QuadPart;
+}
+
+inline u64 get_ticks_per_second()
+{
+	LARGE_INTEGER li;
+
+	assert(QueryPerformanceFrequency(&li));
+
+	return li.QuadPart;
 }
 
 LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -555,6 +582,16 @@ int main(int argc, const char** argv)
 	u32 sprite_shader;
 	u32 test_texture;
 	MSG window_message;
+	u64 tick_count;
+	u64 start_tick_count;
+	u64 ticks_per_second;
+	f32 time;
+	f32 time_since_simulation;
+	f32 last_simulation_time = -1.f;
+	f32 fps;
+	u64 simulation_count = 0;
+	u64 frame_count = 0;
+	f32 last_printf_time = 0.f;
 
 	HMODULE module_handle;
 
@@ -600,6 +637,7 @@ int main(int argc, const char** argv)
 
 	assert(wglChoosePixelFormatARB = gl_get_proc_address("wglChoosePixelFormatARB"));
 	assert(wglCreateContextAttribsARB = gl_get_proc_address("wglCreateContextAttribsARB"));
+	assert(wglSwapIntervalEXT = gl_get_proc_address("wglSwapIntervalEXT"));
 
 	assert(glGetError = gl_get_proc_address("glGetError"));
 	assert(glBindBuffer = gl_get_proc_address("glBindBuffer"));
@@ -683,6 +721,8 @@ int main(int argc, const char** argv)
 	assert(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
 	assert(wglMakeCurrent(device_context, rendering_context));
 
+	//wglSwapIntervalEXT(true);
+
 	ShowWindow(window_handle, SW_SHOW);
 
 	for(u32 i = 0, j = 0;
@@ -711,6 +751,9 @@ int main(int argc, const char** argv)
 	entity_flags[entity_count] |= HAS_POSITION | HAS_TEXTURE;
 	entity_count++;
 
+	assert(ticks_per_second = get_ticks_per_second());
+	assert(start_tick_count = get_tick_count());
+
 	while(true)
 	{
 		while(PeekMessage(&window_message, window_handle, 0, 0, PM_REMOVE) > 0)
@@ -719,14 +762,26 @@ int main(int argc, const char** argv)
 			DispatchMessage(&window_message);
 		}
 
-		for(u64 entity = 0; entity < entity_count; entity++)
+		assert(tick_count = get_tick_count());
+
+		time = ((f32) tick_count - (f32) start_tick_count) / (f32) ticks_per_second;
+
+		time_since_simulation = time - last_simulation_time;
+
+		if(time_since_simulation > SIMULATION_TIME_INTERVAL)
 		{
-			if(entity_flags[entity] & HAS_POSITION)
+			for(u64 entity = 0; entity < entity_count; entity++)
 			{
-				entity_positions[entity].x += 1.f;
-				entity_positions[entity].y += 1.f;
-				//entity_positions[entity].z += 1.;
+				if(entity_flags[entity] & HAS_POSITION)
+				{
+					entity_positions[entity].x += 1.f;
+					entity_positions[entity].y += 1.f;
+					//entity_positions[entity].z += 1.;
+				}
 			}
+
+			simulation_count++;
+			last_simulation_time = time;
 		}
 
 		{
@@ -804,6 +859,17 @@ int main(int argc, const char** argv)
 		draw_triangles(num_sprite_indices);
 
 		SwapBuffers(device_context);
+
+		frame_count++;
+
+		if(time - last_printf_time > 1.f)
+		{
+			const float avg_fps = (f32) frame_count / time;
+
+			TRACE("Simulation count %I64d Frame count %I64d Time %0.2f FPS %0.2f\n", simulation_count, frame_count, time, avg_fps);
+
+			last_printf_time = time;
+		}
 
 		num_sprite_vertices = 0, num_sprite_indices = 0;
 	}
