@@ -2,7 +2,8 @@
 #include <Windows.h>
 #include <stdio.h>
 #include <assert.h>
-//#define assert(x) x
+
+#define dcheck(x) assert(x)
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -192,8 +193,7 @@ nil(__stdcall* glUseProgram)(u32 program);
 u32(__stdcall* glGetError)();
 
 int _t_gl_error = 0;
-#define gl_assert(x) x; if((_t_gl_error = glGetError()) != 0) { printf("gl_assert: %d\n", _t_gl_error); __debugbreak(); }
-
+#define gl_dcheck(x) x; if((_t_gl_error = glGetError()) != 0) { printf("gl_assert: %d\n", _t_gl_error); __debugbreak(); }
 
 typedef struct {
 	u32 type;
@@ -246,19 +246,19 @@ u32 compile_shader(const char* shader_source, const char* shader_type)
 	else if(shader_type == "fragment")
 		shader_type_id = GL_FRAGMENT_SHADER;
 	else
-		assert(false);
+		dcheck(false);
 
 	u32 shader = glCreateShader(shader_type_id);
-	gl_assert(glShaderSource(shader, 1, &shader_source, NULL));
-	gl_assert(glCompileShader(shader));
+	gl_dcheck(glShaderSource(shader, 1, &shader_source, NULL));
+	gl_dcheck(glCompileShader(shader));
 
 	int compilation_status;
 	char compilation_log[512];
-	gl_assert(glGetShaderiv(shader, GL_COMPILE_STATUS, &compilation_status));
+	gl_dcheck(glGetShaderiv(shader, GL_COMPILE_STATUS, &compilation_status));
 	if(!compilation_status)
 	{
-		gl_assert(glGetShaderInfoLog(shader, 512, NULL, compilation_log));
-		assert(false);
+		gl_dcheck(glGetShaderInfoLog(shader, 512, NULL, compilation_log));
+		dcheck(false);
 	};
 	return shader;
 }
@@ -288,10 +288,10 @@ void setup_vertex_attributes(u32 shader, const ShaderAttribute attributes[MAX_SH
 		if(attributes[i].type == TYPE_ID_FLOAT)
 			gl_type_id = GL_FLOAT, type_size = TYPE_SIZE_FLOAT;
 
-		assert(gl_type_id && type_size);
+		dcheck(gl_type_id && type_size);
 
-		gl_assert(glEnableVertexAttribArray(index));
-		gl_assert(glVertexAttribPointer(index, attributes[i].count, gl_type_id, false, stride, offset));
+		gl_dcheck(glEnableVertexAttribArray(index));
+		gl_dcheck(glVertexAttribPointer(index, attributes[i].count, gl_type_id, false, stride, offset));
 
 		offset += attributes[i].count * type_size;
 		index++;
@@ -300,7 +300,7 @@ void setup_vertex_attributes(u32 shader, const ShaderAttribute attributes[MAX_SH
 
 u8 use_shader(u32 shader)
 {
-	gl_assert(glUseProgram(shader));
+	gl_dcheck(glUseProgram(shader));
 
 	return true;
 }
@@ -312,21 +312,21 @@ u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_
 	u32 vertex_shader = compile_shader(fragment_shader_source, "fragment");
 	u32 program = glCreateProgram();
 
-	gl_assert(glAttachShader(program, vertex_shader));
-	gl_assert(glAttachShader(program, fragment_shader));
-	gl_assert(glLinkProgram(program));
+	gl_dcheck(glAttachShader(program, vertex_shader));
+	gl_dcheck(glAttachShader(program, fragment_shader));
+	gl_dcheck(glLinkProgram(program));
 
 	i32 compilation_status;
 	char compilation_log[512];
-	gl_assert(glGetProgramiv(program, GL_LINK_STATUS, &compilation_status));
+	gl_dcheck(glGetProgramiv(program, GL_LINK_STATUS, &compilation_status));
 	if(!compilation_status)
 	{
-		gl_assert(glGetProgramInfoLog(program, 512, NULL, compilation_log));
-		assert(false);
+		gl_dcheck(glGetProgramInfoLog(program, 512, NULL, compilation_log));
+		dcheck(false);
 	}
 	// delete the shaders as they're linked into our program now and no longer necessary
-	gl_assert(glDeleteShader(vertex_shader));
-	gl_assert(glDeleteShader(fragment_shader));
+	gl_dcheck(glDeleteShader(vertex_shader));
+	gl_dcheck(glDeleteShader(fragment_shader));
 
 	setup_vertex_attributes(program, attributes);
 
@@ -343,7 +343,7 @@ u8 load_texture(u32 texture_id, const void** data, u32* width, u32* height, u32*
 	if(texture_id == TEXTURE_WALL)
 		path = "./wall.jpg";
 
-	assert(path);
+	dcheck(path);
 
 	const void* result = stbi_load(path, width, height, num_channels, 0);
 
@@ -357,16 +357,16 @@ u8 load_texture(u32 texture_id, const void** data, u32* width, u32* height, u32*
 u32 create_texture_from_memory(const void* data, u32 width, u32 height, u32 num_channels)
 {
 	u32 texture;
-	gl_assert(glGenTextures(1, &texture));
-	gl_assert(glBindTexture(GL_TEXTURE_2D, texture));
+	gl_dcheck(glGenTextures(1, &texture));
+	gl_dcheck(glBindTexture(GL_TEXTURE_2D, texture));
 	// set the texture wrapping/filtering options (on the currently bound texture object)
-	gl_assert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
-	gl_assert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
-	gl_assert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
-	gl_assert(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+	gl_dcheck(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
+	gl_dcheck(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+	gl_dcheck(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+	gl_dcheck(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 	// generate the texture (and mipmap)
-	gl_assert(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
-	gl_assert(glGenerateMipmap(GL_TEXTURE_2D));
+	gl_dcheck(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
+	gl_dcheck(glGenerateMipmap(GL_TEXTURE_2D));
 	return texture;
 }
 
@@ -376,7 +376,7 @@ u32 create_texture(u32 texture_id)
 
 	void* data;
 	u32 width, height, num_channels;
-	assert(load_texture(texture_id, &data, &width, &height, &num_channels));
+	dcheck(load_texture(texture_id, &data, &width, &height, &num_channels));
 
 	texture = create_texture_from_memory(data, width, height, num_channels);
 
@@ -397,46 +397,46 @@ u32 create_vertex_buffer(size_t size, u8 readonly, const void* initial_data)
 u32 create_index_buffer(size_t size, u8 readonly, const void* initial_data)
 {
 	u32 index_buffer = 0;
-	gl_assert(glGenBuffers(1, &index_buffer));
-	gl_assert(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer));
-	gl_assert(glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, initial_data, readonly ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW));
+	gl_dcheck(glGenBuffers(1, &index_buffer));
+	gl_dcheck(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer));
+	gl_dcheck(glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, initial_data, readonly ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW));
 	return index_buffer;
 }
 
 u8 bind_vertex_buffer(u32 vbo)
 {
-	gl_assert(glBindBuffer(GL_ARRAY_BUFFER, vbo));
+	gl_dcheck(glBindBuffer(GL_ARRAY_BUFFER, vbo));
 
 	return true;
 }
 
 u8 bind_index_buffer(u32 ibo)
 {
-	gl_assert(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
+	gl_dcheck(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
 
 	return true;
 }
 
 u8 bind_texture(u32 texture_handle)
 {
-	gl_assert(glBindTexture(GL_TEXTURE_2D, texture_handle));
+	gl_dcheck(glBindTexture(GL_TEXTURE_2D, texture_handle));
 
 	return true;
 }
 
 void write_index_buffer(u32 buffer_handle, const void* data, uintptr data_size)
 {
-	gl_assert(glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, data_size, data));
+	gl_dcheck(glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, data_size, data));
 }
 
 void write_vertex_buffer(u32 vbo, const void* data, uintptr data_size)
 {
-	gl_assert(glBufferSubData(GL_ARRAY_BUFFER, 0, data_size, data));
+	gl_dcheck(glBufferSubData(GL_ARRAY_BUFFER, 0, data_size, data));
 }
 
 void draw_triangles(i32 index_count)
 {
-	gl_assert(glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0));
+	gl_dcheck(glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0));
 }
 
 void clear_background()
@@ -483,7 +483,7 @@ const ShaderAttribute sprite_shader_attributes[MAX_SHADER_ATTRIBUTES] = {
 typedef struct {
 	v2f position;
 	c3f color;
-	v2f texture_pos;
+	v2f texture_offset;
 	s2f texture_size;
 } SpriteVertex;
 
@@ -530,7 +530,7 @@ inline u64 get_tick_count()
 {
 	LARGE_INTEGER li;
 
-	assert(QueryPerformanceCounter(&li));
+	dcheck(QueryPerformanceCounter(&li));
 
 	return li.QuadPart;
 }
@@ -539,7 +539,7 @@ inline u64 get_ticks_per_second()
 {
 	LARGE_INTEGER li;
 
-	assert(QueryPerformanceFrequency(&li));
+	dcheck(QueryPerformanceFrequency(&li));
 
 	return li.QuadPart;
 }
@@ -553,7 +553,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 		case WM_SIZE:
 		{
 			RECT client_rect;
-			assert(GetClientRect(window, &client_rect));
+			dcheck(GetClientRect(window, &client_rect));
 			window_width = (client_rect.right - client_rect.left);
 			window_height = (client_rect.bottom - client_rect.top);
 			break;
@@ -598,8 +598,8 @@ int main(int argc, const char** argv)
 
 	HMODULE module_handle;
 
-	assert(module_handle = GetModuleHandle(nullptr));
-	assert(opengl_module = LoadLibraryA("opengl32.dll"));
+	dcheck(module_handle = GetModuleHandle(nullptr));
+	dcheck(opengl_module = LoadLibraryA("opengl32.dll"));
 
 	WNDCLASSEXA dummy_window_class = {
 		.cbSize = sizeof(WNDCLASSEXA),
@@ -622,62 +622,62 @@ int main(int argc, const char** argv)
 		.iLayerType = PFD_MAIN_PLANE,
 	};
 
-	assert(RegisterClassExA(&dummy_window_class));
+	dcheck(RegisterClassExA(&dummy_window_class));
 
-	assert(dummy_window_handle = CreateWindowExA(0, DUMMY_WINDOW_CLASS_NAME, DUMMY_WINDOW_TITLE,
+	dcheck(dummy_window_handle = CreateWindowExA(0, DUMMY_WINDOW_CLASS_NAME, DUMMY_WINDOW_TITLE,
 		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
 		WINDOW_DEFAULT_WIDTH, WINDOW_DEFAULT_HEIGHT, 0, 0, module_handle, 0));
 
-	assert(dummy_device_context = GetDC(dummy_window_handle));
+	dcheck(dummy_device_context = GetDC(dummy_window_handle));
 
-	assert(dummy_pixel_format = ChoosePixelFormat(dummy_device_context, &dummy_pixel_format_desc));
+	dcheck(dummy_pixel_format = ChoosePixelFormat(dummy_device_context, &dummy_pixel_format_desc));
 
-	assert(SetPixelFormat(dummy_device_context, dummy_pixel_format, &dummy_pixel_format_desc));
+	dcheck(SetPixelFormat(dummy_device_context, dummy_pixel_format, &dummy_pixel_format_desc));
 
-	assert(dummy_rendering_context = wglCreateContext(dummy_device_context));
+	dcheck(dummy_rendering_context = wglCreateContext(dummy_device_context));
 
-	assert(wglMakeCurrent(dummy_device_context, dummy_rendering_context));
+	dcheck(wglMakeCurrent(dummy_device_context, dummy_rendering_context));
 
-	assert(wglChoosePixelFormatARB = gl_get_proc_address("wglChoosePixelFormatARB"));
-	assert(wglCreateContextAttribsARB = gl_get_proc_address("wglCreateContextAttribsARB"));
-	assert(wglSwapIntervalEXT = gl_get_proc_address("wglSwapIntervalEXT"));
+	dcheck(wglChoosePixelFormatARB = gl_get_proc_address("wglChoosePixelFormatARB"));
+	dcheck(wglCreateContextAttribsARB = gl_get_proc_address("wglCreateContextAttribsARB"));
+	dcheck(wglSwapIntervalEXT = gl_get_proc_address("wglSwapIntervalEXT"));
 
-	assert(glGetError = gl_get_proc_address("glGetError"));
-	assert(glBindBuffer = gl_get_proc_address("glBindBuffer"));
-	assert(glGenBuffers = gl_get_proc_address("glGenBuffers"));
-	assert(glBufferData = gl_get_proc_address("glBufferData"));
-	assert(glBufferSubData = gl_get_proc_address("glBufferSubData"));
-	assert(glGetShaderiv = gl_get_proc_address("glGetShaderiv"));
-	assert(glCreateShader = gl_get_proc_address("glCreateShader"));
-	assert(glShaderSource = gl_get_proc_address("glShaderSource"));
-	assert(glCompileShader = gl_get_proc_address("glCompileShader"));
-	assert(glCreateProgram = gl_get_proc_address("glCreateProgram"));
-	assert(glAttachShader = gl_get_proc_address("glAttachShader"));
-	assert(glLinkProgram = gl_get_proc_address("glLinkProgram"));
-	assert(glGetProgramiv = gl_get_proc_address("glGetProgramiv"));
-	assert(glGetProgramInfoLog = gl_get_proc_address("glGetProgramInfoLog"));
-	assert(glGetShaderInfoLog = gl_get_proc_address("glGetShaderInfoLog"));
-	assert(glDeleteShader = gl_get_proc_address("glDeleteShader"));
-	assert(glEnableVertexAttribArray = gl_get_proc_address("glEnableVertexAttribArray"));
-	assert(glVertexAttribPointer = gl_get_proc_address("glVertexAttribPointer"));
-	assert(glGenTextures = gl_get_proc_address("glGenTextures"));
-	assert(glBindTexture = gl_get_proc_address("glBindTexture"));
-	assert(glTexParameteri = gl_get_proc_address("glTexParameteri"));
-	assert(glTexImage2D = gl_get_proc_address("glTexImage2D"));
-	assert(glGenerateMipmap = gl_get_proc_address("glGenerateMipmap"));
-	assert(glDrawElements = gl_get_proc_address("glDrawElements"));
-	assert(glViewport = gl_get_proc_address("glViewport"));
-	assert(glClearColor = gl_get_proc_address("glClearColor"));
-	assert(glClear = gl_get_proc_address("glClear"));
-	assert(glUseProgram = gl_get_proc_address("glUseProgram"));
+	dcheck(glGetError = gl_get_proc_address("glGetError"));
+	dcheck(glBindBuffer = gl_get_proc_address("glBindBuffer"));
+	dcheck(glGenBuffers = gl_get_proc_address("glGenBuffers"));
+	dcheck(glBufferData = gl_get_proc_address("glBufferData"));
+	dcheck(glBufferSubData = gl_get_proc_address("glBufferSubData"));
+	dcheck(glGetShaderiv = gl_get_proc_address("glGetShaderiv"));
+	dcheck(glCreateShader = gl_get_proc_address("glCreateShader"));
+	dcheck(glShaderSource = gl_get_proc_address("glShaderSource"));
+	dcheck(glCompileShader = gl_get_proc_address("glCompileShader"));
+	dcheck(glCreateProgram = gl_get_proc_address("glCreateProgram"));
+	dcheck(glAttachShader = gl_get_proc_address("glAttachShader"));
+	dcheck(glLinkProgram = gl_get_proc_address("glLinkProgram"));
+	dcheck(glGetProgramiv = gl_get_proc_address("glGetProgramiv"));
+	dcheck(glGetProgramInfoLog = gl_get_proc_address("glGetProgramInfoLog"));
+	dcheck(glGetShaderInfoLog = gl_get_proc_address("glGetShaderInfoLog"));
+	dcheck(glDeleteShader = gl_get_proc_address("glDeleteShader"));
+	dcheck(glEnableVertexAttribArray = gl_get_proc_address("glEnableVertexAttribArray"));
+	dcheck(glVertexAttribPointer = gl_get_proc_address("glVertexAttribPointer"));
+	dcheck(glGenTextures = gl_get_proc_address("glGenTextures"));
+	dcheck(glBindTexture = gl_get_proc_address("glBindTexture"));
+	dcheck(glTexParameteri = gl_get_proc_address("glTexParameteri"));
+	dcheck(glTexImage2D = gl_get_proc_address("glTexImage2D"));
+	dcheck(glGenerateMipmap = gl_get_proc_address("glGenerateMipmap"));
+	dcheck(glDrawElements = gl_get_proc_address("glDrawElements"));
+	dcheck(glViewport = gl_get_proc_address("glViewport"));
+	dcheck(glClearColor = gl_get_proc_address("glClearColor"));
+	dcheck(glClear = gl_get_proc_address("glClear"));
+	dcheck(glUseProgram = gl_get_proc_address("glUseProgram"));
 
-	assert(wglMakeCurrent(dummy_device_context, 0));
+	dcheck(wglMakeCurrent(dummy_device_context, 0));
 
-	assert(wglDeleteContext(dummy_rendering_context));
+	dcheck(wglDeleteContext(dummy_rendering_context));
 
-	assert(ReleaseDC(dummy_window_handle, dummy_device_context));
+	dcheck(ReleaseDC(dummy_window_handle, dummy_device_context));
 
-	assert(DestroyWindow(dummy_window_handle));
+	dcheck(DestroyWindow(dummy_window_handle));
 
 	WNDCLASSEXA window_class = {
 		.cbSize = sizeof(WNDCLASSEXA),
@@ -707,22 +707,22 @@ int main(int argc, const char** argv)
 		0,
 	};
 
-	assert(RegisterClassExA(&window_class));
+	dcheck(RegisterClassExA(&window_class));
 
-	assert(window_handle = CreateWindowExA(0, WINDOW_CLASS_NAME, WINDOW_TITLE,
+	dcheck(window_handle = CreateWindowExA(0, WINDOW_CLASS_NAME, WINDOW_TITLE,
 		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
 		WINDOW_DEFAULT_WIDTH, WINDOW_DEFAULT_HEIGHT, 0, 0, module_handle, 0));
 
-	assert(device_context = GetDC(window_handle));
+	dcheck(device_context = GetDC(window_handle));
 
-	assert(wglChoosePixelFormatARB(device_context, pixel_format_attributes, 0, 1, &window_pixel_format, &num_window_pixel_formats));
+	dcheck(wglChoosePixelFormatARB(device_context, pixel_format_attributes, 0, 1, &window_pixel_format, &num_window_pixel_formats));
 
-	assert(DescribePixelFormat(device_context, window_pixel_format, sizeof(pixel_format_desc), &pixel_format_desc));
+	dcheck(DescribePixelFormat(device_context, window_pixel_format, sizeof(pixel_format_desc), &pixel_format_desc));
 
-	assert(SetPixelFormat(device_context, window_pixel_format, &pixel_format_desc));
+	dcheck(SetPixelFormat(device_context, window_pixel_format, &pixel_format_desc));
 
-	assert(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
-	assert(wglMakeCurrent(device_context, rendering_context));
+	dcheck(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
+	dcheck(wglMakeCurrent(device_context, rendering_context));
 
 	wglSwapIntervalEXT(false);
 
@@ -742,20 +742,20 @@ int main(int argc, const char** argv)
 
 	begin_gl_setup();
 
-	assert(sprite_index_buffer = create_index_buffer(SPRITE_INDEX_BUFFER_SIZE, true, sprite_indices));
-	assert(sprite_vertex_buffer = create_vertex_buffer(SPRITE_VERTEX_BUFFER_SIZE, false, nullptr));
-	assert(sprite_shader = create_shader(sprite_vertex_shader, sprite_fragment_shader, sprite_shader_attributes));
-	assert(use_shader(sprite_shader));
-	assert(test_texture = create_texture(TEXTURE_WALL));
-	assert(bind_texture(test_texture));
+	dcheck(sprite_index_buffer = create_index_buffer(SPRITE_INDEX_BUFFER_SIZE, true, sprite_indices));
+	dcheck(sprite_vertex_buffer = create_vertex_buffer(SPRITE_VERTEX_BUFFER_SIZE, false, nullptr));
+	dcheck(sprite_shader = create_shader(sprite_vertex_shader, sprite_fragment_shader, sprite_shader_attributes));
+	dcheck(use_shader(sprite_shader));
+	dcheck(test_texture = create_texture(TEXTURE_WALL));
+	dcheck(bind_texture(test_texture));
 
 	end_gl_setup();
 
 	entity_flags[entity_count] |= HAS_POSITION | HAS_TEXTURE;
 	entity_count++;
 
-	assert(ticks_per_second = get_ticks_per_second());
-	assert(start_tick_count = get_tick_count());
+	dcheck(ticks_per_second = get_ticks_per_second());
+	dcheck(start_tick_count = get_tick_count());
 
 	while(true)
 	{
@@ -765,7 +765,7 @@ int main(int argc, const char** argv)
 			DispatchMessage(&window_message);
 		}
 
-		assert(tick_count = get_tick_count());
+		dcheck(tick_count = get_tick_count());
 
 		time = (f32) (tick_count - start_tick_count) / (f32) ticks_per_second;
 
@@ -794,28 +794,28 @@ int main(int argc, const char** argv)
 			{
 				SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
 				sprite_vertex->position = TOP_LEFT_NDC_V2F;
-				sprite_vertex->texture_pos = TOP_LEFT_TEX_V2F;
+				sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
 				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 				sprite_vertex->color = WHITE;
 
 				sprite_vertex++;
 
 				sprite_vertex->position = TOP_RIGHT_NDC_V2F;
-				sprite_vertex->texture_pos = TOP_RIGHT_TEX_V2F;
+				sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
 				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 				sprite_vertex->color = WHITE;
 
 				sprite_vertex++;
 
 				sprite_vertex->position = BOT_LEFT_NDC_V2F;
-				sprite_vertex->texture_pos = BOT_LEFT_TEX_V2F;
+				sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
 				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 				sprite_vertex->color = WHITE;
 
 				sprite_vertex++;
 
 				sprite_vertex->position = BOT_RIGHT_NDC_V2F;
-				sprite_vertex->texture_pos = BOT_RIGHT_TEX_V2F;
+				sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
 				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 				sprite_vertex->color = WHITE;
 
@@ -828,29 +828,29 @@ int main(int argc, const char** argv)
 				if(entity_flags[entity] & HAS_TEXTURE && entity_flags[entity] & HAS_POSITION)
 				{
 					SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
-					assert(world_to_ndc_v2f(&entity_positions[entity], &sprite_vertex->position));
-					sprite_vertex->texture_pos = TOP_LEFT_TEX_V2F;
+					dcheck(world_to_ndc_v2f(&entity_positions[entity], &sprite_vertex->position));
+					sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
 					sprite_vertex->position = TOP_RIGHT_NDC_V2F;
-					sprite_vertex->texture_pos = TOP_RIGHT_TEX_V2F;
+					sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
 					sprite_vertex->position = BOT_LEFT_NDC_V2F;
-					sprite_vertex->texture_pos = BOT_LEFT_TEX_V2F;
+					sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
 					sprite_vertex->position = BOT_RIGHT_NDC_V2F;
-					sprite_vertex->texture_pos = BOT_RIGHT_TEX_V2F;
+					sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
@@ -873,8 +873,6 @@ int main(int argc, const char** argv)
 
 		if(time - last_printf_time > 1.f)
 		{
-			static u32 framecount_last = 0;
-
 			const float avg_fps = (f32) frame_count / time;
 			const float avg_simulations = (f32) simulation_count / time;
 
