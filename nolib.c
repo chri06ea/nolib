@@ -17,6 +17,7 @@
 #endif
 
 typedef float f32;
+typedef float f64;
 typedef unsigned char u8;
 typedef unsigned long u32;
 typedef long i32;
@@ -194,6 +195,13 @@ nil(__stdcall* glViewport)(i32 x, i32 y, i32 width, i32 height);
 nil(__stdcall* glClearColor)(f32 red, f32 green, f32 blue, f32 alpha);
 nil(__stdcall* glClear)(u32 mask);
 nil(__stdcall* glUseProgram)(u32 program);
+nil(__stdcall* glTranslatef)(f32 x, f32 y, f32 z);
+nil(__stdcall* glScalef)(f32 x, f32 y, f32 z);
+nil(__stdcall* glRotatef)(f32 angle, f32 x, f32 y, f32 z);
+nil(__stdcall* glMatrixMode)(u32 mode);
+nil(__stdcall* glLoadIdentity)();
+nil(__stdcall* glRotatef)(f32 angle, f32 x, f32 y, f32 z);
+nil(__stdcall* glOrtho)(f64 left, f64 right, f64 bottom, f64 top, f64 zNear, f64 zFar);
 u32(__stdcall* glGetError)();
 
 int _t_gl_error = 0;
@@ -209,10 +217,10 @@ const v2f TOP_RIGHT_NDC_V2F = {-1.f, +1.f};
 const v2f BOT_LEFT_NDC_V2F = {+1.f, -1.f};
 const v2f BOT_RIGHT_NDC_V2F = {+1.f, +1.f};
 
-const v2f TOP_LEFT_TEX_V2F = {1.f, 1.f};
-const v2f TOP_RIGHT_TEX_V2F = {0.f, 1.f};
-const v2f BOT_LEFT_TEX_V2F = {1.f, 0.f};
-const v2f BOT_RIGHT_TEX_V2F = {0.f, 0.f};
+const v2f TOP_LEFT_TEX_V2F = {0.f, 1.f};
+const v2f TOP_RIGHT_TEX_V2F = {1.f, 1.f};
+const v2f BOT_LEFT_TEX_V2F = {0.f, 0.f};
+const v2f BOT_RIGHT_TEX_V2F = {1.f, 0.f};
 
 const s2f TEX_ATLAS_SIZE = {512.f, 512.f};
 
@@ -449,6 +457,11 @@ void clear_background()
 	glClear(GL_COLOR_BUFFER_BIT);
 }
 
+void disable_vsync()
+{
+	dcheck(wglSwapIntervalEXT(false));
+}
+
 const char* sprite_vertex_shader = "								\n\
 	#version 330 core												\n\
 	layout (location = 0) in vec2 a_pos;							\n\
@@ -570,6 +583,14 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 	return result;
 }
 
+inline v2f add_v2f(const v2f* v, f32 x, f32 y)
+{
+	v2f r;
+	r.x = v->x + x;
+	r.y = v->y + y;
+	return r;
+}
+
 int main(int argc, const char** argv)
 {
 	HWND dummy_window_handle;
@@ -674,6 +695,13 @@ int main(int argc, const char** argv)
 	dcheck(glClearColor = gl_get_proc_address("glClearColor"));
 	dcheck(glClear = gl_get_proc_address("glClear"));
 	dcheck(glUseProgram = gl_get_proc_address("glUseProgram"));
+	dcheck(glTranslatef = gl_get_proc_address("glTranslatef"));
+	dcheck(glRotatef = gl_get_proc_address("glRotatef"));
+	dcheck(glScalef = gl_get_proc_address("glScalef"));
+	dcheck(glMatrixMode = gl_get_proc_address("glMatrixMode"));
+	dcheck(glLoadIdentity = gl_get_proc_address("glLoadIdentity"));
+	dcheck(glRotatef = gl_get_proc_address("glRotatef"));
+	dcheck(glOrtho = gl_get_proc_address("glOrtho"));
 
 	dcheck(wglMakeCurrent(dummy_device_context, 0));
 
@@ -727,10 +755,11 @@ int main(int argc, const char** argv)
 
 	dcheck(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
 	dcheck(wglMakeCurrent(device_context, rendering_context));
-	
+
 	disable_vsync();
 
-	ShowWindow(window_handle, SW_SHOW);
+
+	dcheck(ShowWindow(window_handle, SW_NORMAL));
 
 	for(u32 i = 0, j = 0;
 		i < MAX_SPRITE_INDICES - INDICES_PER_SPRITE;
@@ -832,29 +861,41 @@ int main(int argc, const char** argv)
 				if(entity_flags[entity] & HAS_TEXTURE && entity_flags[entity] & HAS_POSITION)
 				{
 					SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
-					dcheck(world_to_ndc_v2f(&entity_positions[entity], &sprite_vertex->position));
-					sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
+
+					const v2f TILE_TOP_LEFT_TEX_V2F = {0.0f, 0.3f};
+					const v2f TILE_TOP_RIGHT_TEX_V2F = {0.3f, 0.3f};
+					const v2f TILE_BOT_LEFT_TEX_V2F = {0.0f, 0.0f};
+					const v2f TILE_BOT_RIGHT_TEX_V2F = {0.3f, 0.0f};
+
+					const f32 tex_offset_x = 0.1f;
+					const f32 tex_offset_y = 0.1f;
+
+					v2f ndc_origin;
+					dcheck(world_to_ndc_v2f(&entity_positions[entity], &ndc_origin));
+
+					sprite_vertex->position = add_v2f(&ndc_origin, -tex_offset_x, -tex_offset_y);
+					sprite_vertex->texture_offset = TILE_TOP_LEFT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
-					sprite_vertex->position = TOP_RIGHT_NDC_V2F;
-					sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
+					sprite_vertex->position = add_v2f(&ndc_origin, tex_offset_x, -tex_offset_y);
+					sprite_vertex->texture_offset = TILE_TOP_RIGHT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
-					sprite_vertex->position = BOT_LEFT_NDC_V2F;
-					sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
+					sprite_vertex->position = add_v2f(&ndc_origin, -tex_offset_x, tex_offset_y);
+					sprite_vertex->texture_offset = TILE_BOT_LEFT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
-					sprite_vertex->position = BOT_RIGHT_NDC_V2F;
-					sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
+					sprite_vertex->position = add_v2f(&ndc_origin, tex_offset_x, tex_offset_y);
+					sprite_vertex->texture_offset = TILE_BOT_RIGHT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
@@ -864,7 +905,14 @@ int main(int argc, const char** argv)
 			}
 
 			clear_background();
+#define GL_MODELVIEW_MATRIX 0x0BA6
+#define GL_PROJECTION_MATRIX 0x0BA7
+#define GL_TEXTURE_MATRIX 0x0BA8
+#define GL_MODELVIEW 0x1700
+#define GL_PROJECTION 0x1701
+#define GL_TEXTURE 0x1702
 
+			glMatrixMode(GL_TEXTURE);
 			write_vertex_buffer(sprite_vertex_buffer, sprite_vertices, num_sprite_vertices * sizeof(SpriteVertex));
 
 			draw_triangles(num_sprite_indices);
@@ -887,9 +935,4 @@ int main(int argc, const char** argv)
 
 		num_sprite_vertices = 0, num_sprite_indices = 0;
 	}
-}
-
-void disable_vsync()
-{
-	dcheck(wglSwapIntervalEXT(false));
 }
