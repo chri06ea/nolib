@@ -213,16 +213,16 @@ typedef struct {
 } ShaderAttribute;
 
 const v2f TOP_LEFT_NDC_V2F = {-1.f, -1.f};
-const v2f TOP_RIGHT_NDC_V2F = {-1.f, +1.f};
-const v2f BOT_LEFT_NDC_V2F = {+1.f, -1.f};
+const v2f TOP_RIGHT_NDC_V2F = {+1.f, -1.f};
+const v2f BOT_LEFT_NDC_V2F = {-1.f, +1.f};
 const v2f BOT_RIGHT_NDC_V2F = {+1.f, +1.f};
 
-const v2f TOP_LEFT_TEX_V2F = {0.f, 1.f};
-const v2f TOP_RIGHT_TEX_V2F = {1.f, 1.f};
-const v2f BOT_LEFT_TEX_V2F = {0.f, 0.f};
-const v2f BOT_RIGHT_TEX_V2F = {1.f, 0.f};
+v2f TOP_LEFT_TEX_V2F = {0, 1.f};
+v2f TOP_RIGHT_TEX_V2F = {1.f, 1.f};
+v2f BOT_LEFT_TEX_V2F = {0.f, 0.f};
+v2f BOT_RIGHT_TEX_V2F = {1.f, 0.f};
 
-const s2f TEX_ATLAS_SIZE = {512.f, 512.f};
+const s2f TEX_ATLAS_SIZE = {1000.f, 1000.f};
 
 const c3f WHITE = {1.f, 1.f, 1.f};
 
@@ -346,7 +346,7 @@ u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_
 }
 
 #define TEXTURE_WALL 1
-
+#define TEXTURE_SPRITE_ATLAS 1
 
 u8 load_texture(u32 texture_id, const void** data, u32* width, u32* height, u32* num_channels)
 {
@@ -354,6 +354,9 @@ u8 load_texture(u32 texture_id, const void** data, u32* width, u32* height, u32*
 
 	if(texture_id == TEXTURE_WALL)
 		path = "./wall.jpg";
+
+	if(texture_id == TEXTURE_SPRITE_ATLAS)
+		path = "./atlas.png";
 
 	dcheck(path);
 
@@ -377,7 +380,7 @@ u32 create_texture_from_memory(const void* data, u32 width, u32 height, u32 num_
 	gl_dcheck(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
 	gl_dcheck(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 	// generate the texture (and mipmap)
-	gl_dcheck(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
+	gl_dcheck(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data));
 	gl_dcheck(glGenerateMipmap(GL_TEXTURE_2D));
 	return texture;
 }
@@ -591,6 +594,11 @@ inline v2f add_v2f(const v2f* v, f32 x, f32 y)
 	return r;
 }
 
+void draw_sprite_at_screenpos(const v2f* origin)
+{
+
+}
+
 int main(int argc, const char** argv)
 {
 	HWND dummy_window_handle;
@@ -758,8 +766,7 @@ int main(int argc, const char** argv)
 
 	disable_vsync();
 
-
-	dcheck(ShowWindow(window_handle, SW_NORMAL));
+	ShowWindow(window_handle, SW_NORMAL);
 
 	for(u32 i = 0, j = 0;
 		i < MAX_SPRITE_INDICES - INDICES_PER_SPRITE;
@@ -779,7 +786,7 @@ int main(int argc, const char** argv)
 	dcheck(sprite_vertex_buffer = create_vertex_buffer(SPRITE_VERTEX_BUFFER_SIZE, false, nullptr));
 	dcheck(sprite_shader = create_shader(sprite_vertex_shader, sprite_fragment_shader, sprite_shader_attributes));
 	dcheck(use_shader(sprite_shader));
-	dcheck(test_texture = create_texture(TEXTURE_WALL));
+	dcheck(test_texture = create_texture(TEXTURE_SPRITE_ATLAS));
 	dcheck(bind_texture(test_texture));
 
 	end_gl_setup();
@@ -867,34 +874,35 @@ int main(int argc, const char** argv)
 					const v2f TILE_BOT_LEFT_TEX_V2F = {0.0f, 0.0f};
 					const v2f TILE_BOT_RIGHT_TEX_V2F = {0.3f, 0.0f};
 
-					const f32 tex_offset_x = 0.1f;
-					const f32 tex_offset_y = 0.1f;
+					const float ndc_width_per_pixel = 2.f / 800.f;
+					const float texture_width = 30.f * ndc_width_per_pixel;
+					const float texture_height = 30.f * ndc_width_per_pixel;
 
 					v2f ndc_origin;
 					dcheck(world_to_ndc_v2f(&entity_positions[entity], &ndc_origin));
 
-					sprite_vertex->position = add_v2f(&ndc_origin, -tex_offset_x, -tex_offset_y);
+					sprite_vertex->position = add_v2f(&ndc_origin, -texture_width, -texture_width);
 					sprite_vertex->texture_offset = TILE_TOP_LEFT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
-					sprite_vertex->position = add_v2f(&ndc_origin, tex_offset_x, -tex_offset_y);
+					sprite_vertex->position = add_v2f(&ndc_origin, texture_width, -texture_height);
 					sprite_vertex->texture_offset = TILE_TOP_RIGHT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
-					sprite_vertex->position = add_v2f(&ndc_origin, -tex_offset_x, tex_offset_y);
+					sprite_vertex->position = add_v2f(&ndc_origin, -texture_width, texture_height);
 					sprite_vertex->texture_offset = TILE_BOT_LEFT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
 
 					sprite_vertex++;
 
-					sprite_vertex->position = add_v2f(&ndc_origin, tex_offset_x, tex_offset_y);
+					sprite_vertex->position = add_v2f(&ndc_origin, texture_width, texture_height);
 					sprite_vertex->texture_offset = TILE_BOT_RIGHT_TEX_V2F;
 					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
 					sprite_vertex->color = WHITE;
@@ -905,12 +913,12 @@ int main(int argc, const char** argv)
 			}
 
 			clear_background();
-#define GL_MODELVIEW_MATRIX 0x0BA6
-#define GL_PROJECTION_MATRIX 0x0BA7
-#define GL_TEXTURE_MATRIX 0x0BA8
-#define GL_MODELVIEW 0x1700
-#define GL_PROJECTION 0x1701
-#define GL_TEXTURE 0x1702
+			#define GL_MODELVIEW_MATRIX 0x0BA6
+			#define GL_PROJECTION_MATRIX 0x0BA7
+			#define GL_TEXTURE_MATRIX 0x0BA8
+			#define GL_MODELVIEW 0x1700
+			#define GL_PROJECTION 0x1701
+			#define GL_TEXTURE 0x1702
 
 			glMatrixMode(GL_TEXTURE);
 			write_vertex_buffer(sprite_vertex_buffer, sprite_vertices, num_sprite_vertices * sizeof(SpriteVertex));
