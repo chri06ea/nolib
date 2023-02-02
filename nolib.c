@@ -530,6 +530,7 @@ u32 max_vertices;
 #define SIMULATION_TIME_INTERVAL (1.f / (f32)SIMULATIONS_PER_SECOND)
 #define RENDER_TIME_INTERVAL SIMULATION_TIME_INTERVAL
 
+
 inline u8 screen_to_ndc_v2f(const v2f* screen_pos, v2f* ndc_pos)
 {
 	ndc_pos->x = ((screen_pos->x / window_width) * 2) - 1.f;
@@ -594,9 +595,53 @@ inline v2f add_v2f(const v2f* v, f32 x, f32 y)
 	return r;
 }
 
+inline v2f add_v2f_v2f(const v2f* v, const v2f* v2)
+{
+	v2f r;
+	r.x = v->x + v2->x;
+	r.y = v->y + v2->y;
+	return r;
+}
+
 void draw_sprite_at_screenpos(const v2f* origin)
 {
 
+}
+
+void render_world()
+{
+
+	SpriteVertex* sprite_vertex;
+
+	sprite_vertex = &sprite_vertices[num_sprite_vertices];
+	sprite_vertex->position = TOP_LEFT_NDC_V2F;
+	sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	sprite_vertex++;
+
+	sprite_vertex->position = TOP_RIGHT_NDC_V2F;
+	sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	sprite_vertex++;
+
+	sprite_vertex->position = BOT_LEFT_NDC_V2F;
+	sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	sprite_vertex++;
+
+	sprite_vertex->position = BOT_RIGHT_NDC_V2F;
+	sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	num_sprite_vertices += VERTICES_PER_SPRITE;
+	num_sprite_indices += INDICES_PER_SPRITE;
 }
 
 int main(int argc, const char** argv)
@@ -831,37 +876,6 @@ int main(int argc, const char** argv)
 
 		if(time_since_render >= RENDER_TIME_INTERVAL)
 		{
-			{
-				SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
-				sprite_vertex->position = TOP_LEFT_NDC_V2F;
-				sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
-				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-				sprite_vertex->color = WHITE;
-
-				sprite_vertex++;
-
-				sprite_vertex->position = TOP_RIGHT_NDC_V2F;
-				sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
-				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-				sprite_vertex->color = WHITE;
-
-				sprite_vertex++;
-
-				sprite_vertex->position = BOT_LEFT_NDC_V2F;
-				sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
-				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-				sprite_vertex->color = WHITE;
-
-				sprite_vertex++;
-
-				sprite_vertex->position = BOT_RIGHT_NDC_V2F;
-				sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
-				sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-				sprite_vertex->color = WHITE;
-
-				num_sprite_vertices += VERTICES_PER_SPRITE;
-				num_sprite_indices += INDICES_PER_SPRITE;
-			}
 
 			for(u64 entity = 0; entity < entity_count; entity++)
 			{
@@ -869,12 +883,14 @@ int main(int argc, const char** argv)
 				{
 					SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
 
-					const v2f TILE_TOP_LEFT_TEX_V2F = {0.0f, 0.3f};
-					const v2f TILE_TOP_RIGHT_TEX_V2F = {0.3f, 0.3f};
-					const v2f TILE_BOT_LEFT_TEX_V2F = {0.0f, 0.0f};
-					const v2f TILE_BOT_RIGHT_TEX_V2F = {0.3f, 0.0f};
+					const f32 ndc_width_per_pixel = 2.f / (f32) window_width;
+					const f32 offset = ndc_width_per_pixel * 6;
 
-					const float ndc_width_per_pixel = 2.f / 800.f;
+					const v2f TILE_TOP_LEFT_TEX_V2F = {0.0f, offset};
+					const v2f TILE_TOP_RIGHT_TEX_V2F = {offset, offset};
+					const v2f TILE_BOT_LEFT_TEX_V2F = {0.0f, 0.0f};
+					const v2f TILE_BOT_RIGHT_TEX_V2F = {offset, 0.0f};
+
 					const float texture_width = 30.f * ndc_width_per_pixel;
 					const float texture_height = 30.f * ndc_width_per_pixel;
 
@@ -909,18 +925,12 @@ int main(int argc, const char** argv)
 
 					num_sprite_vertices += VERTICES_PER_SPRITE;
 					num_sprite_indices += INDICES_PER_SPRITE;
+
 				}
 			}
 
 			clear_background();
-			#define GL_MODELVIEW_MATRIX 0x0BA6
-			#define GL_PROJECTION_MATRIX 0x0BA7
-			#define GL_TEXTURE_MATRIX 0x0BA8
-			#define GL_MODELVIEW 0x1700
-			#define GL_PROJECTION 0x1701
-			#define GL_TEXTURE 0x1702
 
-			glMatrixMode(GL_TEXTURE);
 			write_vertex_buffer(sprite_vertex_buffer, sprite_vertices, num_sprite_vertices * sizeof(SpriteVertex));
 
 			draw_triangles(num_sprite_indices);
