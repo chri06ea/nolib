@@ -5,6 +5,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "nolib.h"
 
 #pragma comment(lib, "opengl32.lib")
 
@@ -294,6 +295,7 @@ u32 compile_shader(const char* shader_source, const char* shader_type)
 	if(!compilation_status)
 	{
 		gl_dcheck(glGetShaderInfoLog(shader, 512, NULL, compilation_log));
+		TRACE(compilation_log);
 		dcheck(false);
 	};
 	return shader;
@@ -340,7 +342,6 @@ u8 use_shader(u32 shader)
 
 	return true;
 }
-
 
 u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_source, const ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
 {
@@ -410,20 +411,20 @@ u32 create_texture_from_memory(const void* data, u32 width, u32 height, u32 num_
 	return texture;
 }
 
-u32 create_texture(u32 texture_id)
-{
-	u32 texture;
-
-	void* data;
-	u32 width, height, num_channels;
-	dcheck(load_texture(texture_id, &data, &width, &height, &num_channels));
-
-	texture = create_texture_from_memory(data, width, height, num_channels);
-
-	stbi_image_free(data);
-
-	return texture;
-}
+//u32 create_texture(u32 texture_id)
+//{
+//	u32 texture;
+//
+//	void* data;
+//	u32 width, height, num_channels;
+//	dcheck(load_texture(texture_id, &data, &width, &height, &num_channels));
+//
+//	texture = create_texture_from_memory(data, width, height, num_channels);
+//
+//	stbi_image_free(data);
+//
+//	return texture;
+//}
 
 u32 create_vertex_buffer(size_t size, u8 readonly, const void* initial_data)
 {
@@ -493,12 +494,19 @@ void write_index_buffer(u32 buffer_handle, const void* data, uintptr data_size)
 
 void write_vertex_buffer(u32 vbo, const void* data, uintptr data_size)
 {
+	bind_vertex_buffer(vbo);
 	gl_dcheck(glBufferSubData(GL_ARRAY_BUFFER, 0, data_size, data));
 }
 
 void write_storage_buffer(u32 sbo, const void* data, uintptr data_size)
 {
 	void* storage_buffer;
+	//gl_dcheck(bind_storage_buffer(sbo));
+	//glBufferData(GL_SHADER_STORAGE_BUFFER,
+	//	data_size,
+	//	data, GL_STATIC_DRAW);
+	//return;
+
 	gl_dcheck(storage_buffer = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY));
 	memcpy(storage_buffer, data, data_size);
 	gl_dcheck(glUnmapBuffer(GL_SHADER_STORAGE_BUFFER));
@@ -520,6 +528,10 @@ void disable_vsync()
 	dcheck(wglSwapIntervalEXT(false));
 }
 
+void set_viewport(u32 x, u32 y, u32 w, u32 h)
+{
+	glViewport(x, y, w, h);
+}
 
 typedef struct {
 	v2f position;
@@ -594,7 +606,8 @@ u8 load_if_updated(const char* path, void* buffer, u32 buffer_size, u32* time_ch
 	file_handle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	dcheck(file_handle != NULL);
 
-	// During frequent access we can't rely on being able to succesfully open the file evertime. That's okay tho
+	// During frequent access we can't rely on being able to succesfully open the file evertime.
+	// This behaviour is needed for hot reloading
 	if(file_handle == INVALID_HANDLE_VALUE)
 		return false;
 
@@ -606,17 +619,21 @@ u8 load_if_updated(const char* path, void* buffer, u32 buffer_size, u32* time_ch
 	if(*time_changed != ftLastWriteTime.dwLowDateTime)
 	{
 		TRACE("Loading file %s\n", path);
-
+		memset(buffer, 0, buffer_size);
 		dcheck(ReadFile(file_handle, buffer, file_size_low, &file_size_read, NULL));
 		dcheck(file_size_read == file_size_low);
 
 		*time_changed = ftLastWriteTime.dwLowDateTime;
 		*size_loaded = file_size_read;
+
+		CloseHandle(file_handle);
+
+		return true;
 	}
 
 	CloseHandle(file_handle);
 
-	return true;
+	return false;
 }
 
 LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -632,7 +649,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 			window_width = (client_rect.right - client_rect.left);
 			window_height = (client_rect.bottom - client_rect.top);
 
-			glViewport(0, 0, window_width, window_height);
+			set_viewport(0, 0, window_width, window_height);
 
 			break;
 		}
@@ -687,10 +704,7 @@ u32 sprite_fragment_shader_source_update_time;
 u32 sprite_fragment_shader_source_size;
 
 const ShaderAttribute sprite_shader_attributes[MAX_SHADER_ATTRIBUTES] = {
-	{.type = TYPE_ID_FLOAT, .count = 2},
-	{.type = TYPE_ID_FLOAT, .count = 3},
-	{.type = TYPE_ID_FLOAT, .count = 2},
-	{.type = TYPE_ID_FLOAT, .count = 2},
+	{.type = TYPE_ID_FLOAT, .count = 0},
 };
 
 char atlas_texture_buffer[0x10000];
@@ -852,7 +866,8 @@ void init_rendering()
 	{
 		sprite_indices[i + 0] = j + 0;
 		sprite_indices[i + 1] = j + 1;
-		sprite_indices[i + 2] = j + 3;
+		sprite_indices[i + 2] = j + 2;
+
 		sprite_indices[i + 3] = j + 2;
 		sprite_indices[i + 4] = j + 3;
 		sprite_indices[i + 5] = j + 0;
@@ -865,8 +880,8 @@ void init_rendering()
 	dcheck(sprite_positions_buffer = create_storage_buffer(sizeof(entity_positions), false, nullptr));
 	dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
 	dcheck(use_shader(sprite_shader));
-	dcheck(test_texture = create_texture(TEXTURE_SPRITE_ATLAS));
-	dcheck(bind_texture(test_texture));
+	//dcheck(test_texture = create_texture_from_memory(TEXTURE_SPRITE_ATLAS));
+	//dcheck(bind_texture(test_texture));
 
 	end_gl_setup();
 }
@@ -923,7 +938,13 @@ void render()
 
 	clear_background();
 
-	write_storage_buffer(sprite_positions_buffer, entity_positions, sizeof(*entity_positions) * entity_count);
+	const float verts[] = {
+		-0.5f, -0.5f,
+		-0.5f, +0.5f,
+		+0.5f, +0.5f,
+	};
+
+	write_storage_buffer(sprite_positions_buffer, verts, sizeof(verts));
 
 	draw_triangles(3);
 
@@ -949,21 +970,23 @@ void hot_reload()
 		//Workaround because stbi has no direct way to load from memory
 		u32 width, height, num_channels;
 		const void* data;
-		dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
-		dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
-		dcheck(bind_texture(atlas_texture));
+		//dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
+		//dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
+		//dcheck(bind_texture(atlas_texture));
 	}
 
 	if(load_if_updated("./sprite.vert", sprite_vertex_shader_source, sizeof(sprite_vertex_shader_source),
 		&sprite_vertex_shader_source_update_time, &sprite_vertex_shader_source_size))
 	{
-		sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes);
+		dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
+		dcheck(use_shader(sprite_shader));
 	}
 
 	if(load_if_updated("./sprite.frag", sprite_fragment_shader_source, sizeof(sprite_fragment_shader_source),
 		&sprite_fragment_shader_source_update_time, &sprite_fragment_shader_source_size))
 	{
-		sprite_shader = create_shader(sprite_fragment_shader_source, sprite_fragment_shader_source, sprite_shader_attributes);
+		dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
+		dcheck(use_shader(sprite_shader));
 	}
 }
 

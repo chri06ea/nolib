@@ -140,6 +140,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="nolib.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>
