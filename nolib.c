@@ -895,7 +895,7 @@ void init_rendering()
 		//temp workaround because stbi has no direct way to load from memory
 		u32 width, height, num_channels;
 		const void* data;
-		stbi_set_flip_vertically_on_load(1);
+		//stbi_set_flip_vertically_on_load(1);
 		dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
 		dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
 	}
@@ -956,7 +956,7 @@ void render()
 
 	clear_background();
 
-	const float verts[] = {
+	float verts[] = {
 		-0.8f, -0.8f,
 		-0.8f, +0.8f,
 		+0.8f, -0.8f,
@@ -989,7 +989,6 @@ void hot_reload()
 		//Workaround because stbi has no direct way to load from memory
 		u32 width, height, num_channels;
 		const void* data;
-		//stbi_set_flip_vertically_on_load(1);
 		dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
 		dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
 		dcheck(bind_texture(atlas_texture));
