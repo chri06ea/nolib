@@ -359,7 +359,7 @@ u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_
 	if(!compilation_status)
 	{
 		gl_dcheck(glGetProgramInfoLog(program, 512, NULL, compilation_log));
-		dcheck(false);
+		TRACE("%s", compilation_log);
 	}
 	// delete the shaders as they're linked into our program now and no longer necessary
 	gl_dcheck(glDeleteShader(vertex_shader));
@@ -880,8 +880,15 @@ void init_rendering()
 	dcheck(sprite_positions_buffer = create_storage_buffer(sizeof(entity_positions), false, nullptr));
 	dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
 	dcheck(use_shader(sprite_shader));
-	//dcheck(test_texture = create_texture_from_memory(TEXTURE_SPRITE_ATLAS));
-	//dcheck(bind_texture(test_texture));
+	{
+		//temp workaround because stbi has no direct way to load from memory
+		u32 width, height, num_channels;
+		const void* data;
+		stbi_set_flip_vertically_on_load(1);
+		dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
+		dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
+	}
+	dcheck(bind_texture(atlas_texture));
 
 	end_gl_setup();
 }
@@ -939,9 +946,9 @@ void render()
 	clear_background();
 
 	const float verts[] = {
-		-0.5f, -0.5f,
-		-0.5f, +0.5f,
-		+0.5f, +0.5f,
+		-0.8f, -0.8f,
+		-0.8f, +0.8f,
+		+0.8f, +0.8f,
 	};
 
 	write_storage_buffer(sprite_positions_buffer, verts, sizeof(verts));
@@ -970,9 +977,10 @@ void hot_reload()
 		//Workaround because stbi has no direct way to load from memory
 		u32 width, height, num_channels;
 		const void* data;
-		//dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
-		//dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
-		//dcheck(bind_texture(atlas_texture));
+		//stbi_set_flip_vertically_on_load(1);
+		dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
+		dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
+		dcheck(bind_texture(atlas_texture));
 	}
 
 	if(load_if_updated("./sprite.vert", sprite_vertex_shader_source, sizeof(sprite_vertex_shader_source),
