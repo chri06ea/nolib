@@ -959,8 +959,8 @@ void render()
 	const float verts[] = {
 		-0.8f, -0.8f,
 		-0.8f, +0.8f,
-		+0.8f, +0.8f,
 		+0.8f, -0.8f,
+		+0.8f, +0.8f,
 	};
 
 	write_storage_buffer(sprite_positions_buffer, verts, sizeof(verts));

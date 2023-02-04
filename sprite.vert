@@ -13,8 +13,8 @@ void main()
     {
 		vec2(2.0, 2.0),
 		vec2(2.0, 13.0),
-		vec2(13.0, 13.0),
 		vec2(13.0, 2.0),
+		vec2(13.0, 13.0),
     };
 
 	vec2 tex_coords = textureCoords2[gl_VertexID];
