@@ -144,6 +144,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="sprite.vert" />
+    <None Include="sprite.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="nolib.c" />

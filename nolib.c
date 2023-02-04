@@ -58,6 +58,23 @@ typedef struct {
 	float w, h;
 } s2f;
 
+
+inline v2f add_v2f(const v2f* v, f32 x, f32 y)
+{
+	v2f r;
+	r.x = v->x + x;
+	r.y = v->y + y;
+	return r;
+}
+
+inline v2f add_v2f_v2f(const v2f* v, const v2f* v2)
+{
+	v2f r;
+	r.x = v->x + v2->x;
+	r.y = v->y + v2->y;
+	return r;
+}
+
 #define true 1
 #define false 0
 
@@ -113,6 +130,7 @@ void* (__stdcall* wglSwapIntervalEXT)(u8 vsync);
 
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
+#define GL_SHADER_STORAGE_BUFFER          0x90D2
 #define GL_STATIC_DRAW 0x88E4
 #define GL_DYNAMIC_DRAW 0x88E8
 #define GL_DEPTH_BUFFER_BIT 0x00000100
@@ -167,10 +185,14 @@ void* (__stdcall* wglSwapIntervalEXT)(u8 vsync);
 #define GL_FILL 0x1B02
 #define GL_KEEP 0x1E00
 #define GL_REPLACE 0x1E01
+#define GL_READ_ONLY 0x88B8
+#define GL_WRITE_ONLY 0x88B9
+#define GL_READ_WRITE 0x88BA
 
 nil(__stdcall* glBindBuffer)(u32 target, u32 buffer);
 nil(__stdcall* glGenBuffers)(i32 count, u32* buffers);
 nil(__stdcall* glBufferData)(u32 target, size_t size, const void* data, u32 usage);
+nil(__stdcall* glBindBufferBase)(u32 target, u32 index, u32 buffer);
 nil(__stdcall* glBufferSubData)(u32 target, intptr offset, uintptr size, const void* data);
 nil(__stdcall* glGetShaderiv)(u32 program, u32 pname, int* params);
 u32(__stdcall* glCreateShader)(u32 type);
@@ -203,6 +225,8 @@ nil(__stdcall* glLoadIdentity)();
 nil(__stdcall* glRotatef)(f32 angle, f32 x, f32 y, f32 z);
 nil(__stdcall* glOrtho)(f64 left, f64 right, f64 bottom, f64 top, f64 zNear, f64 zFar);
 u32(__stdcall* glGetError)();
+void* (__stdcall* glMapBuffer)(u32 target, u32 access);
+u8(__stdcall* glUnmapBuffer)(u32 target);
 
 int _t_gl_error = 0;
 #define gl_dcheck(x) x; if((_t_gl_error = glGetError()) != 0) { printf("gl_assert: %d\n", _t_gl_error); __debugbreak(); }
@@ -369,6 +393,7 @@ u8 load_texture(u32 texture_id, const void** data, u32* width, u32* height, u32*
 
 	return true;
 }
+
 u32 create_texture_from_memory(const void* data, u32 width, u32 height, u32 num_channels)
 {
 	u32 texture;
@@ -418,6 +443,16 @@ u32 create_index_buffer(size_t size, u8 readonly, const void* initial_data)
 	return index_buffer;
 }
 
+u32 create_storage_buffer(size_t size, u8 readonly, const void* initial_data)
+{
+	u32 storage_buffer = 0;
+	gl_dcheck(glGenBuffers(1, &storage_buffer));
+	gl_dcheck(glBindBuffer(GL_SHADER_STORAGE_BUFFER, storage_buffer));
+	gl_dcheck(glBufferData(GL_SHADER_STORAGE_BUFFER, size, initial_data, readonly ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW));
+	gl_dcheck(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, storage_buffer));
+	return storage_buffer;
+}
+
 u8 bind_vertex_buffer(u32 vbo)
 {
 	gl_dcheck(glBindBuffer(GL_ARRAY_BUFFER, vbo));
@@ -432,11 +467,23 @@ u8 bind_index_buffer(u32 ibo)
 	return true;
 }
 
+u8 bind_storage_buffer(u32 sbo)
+{
+	gl_dcheck(glBindBuffer(GL_SHADER_STORAGE_BUFFER, sbo));
+
+	return true;
+}
+
 u8 bind_texture(u32 texture_handle)
 {
 	gl_dcheck(glBindTexture(GL_TEXTURE_2D, texture_handle));
 
 	return true;
+}
+
+void bind_buffer_base(u32 binding_point, u32 sbo)
+{
+	gl_dcheck(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_point, sbo));
 }
 
 void write_index_buffer(u32 buffer_handle, const void* data, uintptr data_size)
@@ -449,6 +496,14 @@ void write_vertex_buffer(u32 vbo, const void* data, uintptr data_size)
 	gl_dcheck(glBufferSubData(GL_ARRAY_BUFFER, 0, data_size, data));
 }
 
+void write_storage_buffer(u32 sbo, const void* data, uintptr data_size)
+{
+	void* storage_buffer;
+	gl_dcheck(storage_buffer = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY));
+	memcpy(storage_buffer, data, data_size);
+	gl_dcheck(glUnmapBuffer(GL_SHADER_STORAGE_BUFFER));
+}
+
 void draw_triangles(i32 index_count)
 {
 	gl_dcheck(glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0));
@@ -456,7 +511,7 @@ void draw_triangles(i32 index_count)
 
 void clear_background()
 {
-	glClearColor(1, 0, 0, 1);
+	glClearColor(0.5f, 1.f, 0.5f, 0.5f);
 	glClear(GL_COLOR_BUFFER_BIT);
 }
 
@@ -465,40 +520,6 @@ void disable_vsync()
 	dcheck(wglSwapIntervalEXT(false));
 }
 
-const char* sprite_vertex_shader = "								\n\
-	#version 330 core												\n\
-	layout (location = 0) in vec2 a_pos;							\n\
-	layout (location = 1) in vec4 a_color;							\n\
-	layout (location = 2) in vec2 a_texture_coords;					\n\
-	layout (location = 3) in vec2 a_texture_size;					\n\
-	out vec4 a_color_;												\n\
-	out vec2 a_texture_coords_;										\n\
-	void main()														\n\
-	{																\n\
-		a_color_ = a_color;											\n\
-		a_texture_coords_ = a_texture_coords;						\n\
-																	\n\
-		gl_Position = vec4(a_pos, 0.0, 1.0);						\n\
-	};";
-
-const char* sprite_fragment_shader = "								\n\
-	#version 330 core												\n\
-	in vec4 a_color_;												\n\
-	in vec2 a_texture_coords_;										\n\
-	out vec4 color;													\n\
-	uniform sampler2D image;										\n\
-	void main()														\n\
-	{																\n\
-		color = vec4(a_color_) * texture(image, a_texture_coords_);	\n\
-	}";
-
-
-const ShaderAttribute sprite_shader_attributes[MAX_SHADER_ATTRIBUTES] = {
-	{.type = TYPE_ID_FLOAT, .count = 2},
-	{.type = TYPE_ID_FLOAT, .count = 3},
-	{.type = TYPE_ID_FLOAT, .count = 2},
-	{.type = TYPE_ID_FLOAT, .count = 2},
-};
 
 typedef struct {
 	v2f position;
@@ -529,7 +550,6 @@ u32 max_vertices;
 #define SIMULATIONS_PER_SECOND 64
 #define SIMULATION_TIME_INTERVAL (1.f / (f32)SIMULATIONS_PER_SECOND)
 #define RENDER_TIME_INTERVAL SIMULATION_TIME_INTERVAL
-
 
 inline u8 screen_to_ndc_v2f(const v2f* screen_pos, v2f* ndc_pos)
 {
@@ -565,6 +585,40 @@ inline u64 get_ticks_per_second()
 	return li.QuadPart;
 }
 
+u8 load_if_updated(const char* path, void* buffer, u32 buffer_size, u32* time_changed, u32* size_loaded)
+{
+	DWORD file_size_low, file_size_high, file_size_read;
+	FILETIME ftCreationTime, ftLastAccessTime, ftLastWriteTime;
+	HANDLE file_handle;
+
+	file_handle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	dcheck(file_handle != NULL);
+
+	// During frequent access we can't rely on being able to succesfully open the file evertime. That's okay tho
+	if(file_handle == INVALID_HANDLE_VALUE)
+		return false;
+
+	dcheck(GetFileTime(file_handle, &ftCreationTime, &ftLastAccessTime, &ftLastWriteTime));
+
+	file_size_low = GetFileSize(file_handle, &file_size_high);
+	dcheck(file_size_low && !file_size_high && buffer_size > file_size_low);
+
+	if(*time_changed != ftLastWriteTime.dwLowDateTime)
+	{
+		TRACE("Loading file %s\n", path);
+
+		dcheck(ReadFile(file_handle, buffer, file_size_low, &file_size_read, NULL));
+		dcheck(file_size_read == file_size_low);
+
+		*time_changed = ftLastWriteTime.dwLowDateTime;
+		*size_loaded = file_size_read;
+	}
+
+	CloseHandle(file_handle);
+
+	return true;
+}
+
 LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
 {
 	LRESULT result = 0;
@@ -577,6 +631,9 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 			dcheck(GetClientRect(window, &client_rect));
 			window_width = (client_rect.right - client_rect.left);
 			window_height = (client_rect.bottom - client_rect.top);
+
+			glViewport(0, 0, window_width, window_height);
+
 			break;
 		}
 
@@ -587,98 +644,115 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 	return result;
 }
 
-inline v2f add_v2f(const v2f* v, f32 x, f32 y)
+HWND dummy_window_handle;
+HDC dummy_device_context;
+int dummy_pixel_format;
+HGLRC dummy_rendering_context;
+
+HWND window_handle;
+HDC device_context;
+HGLRC rendering_context;
+i32 window_pixel_format;
+UINT num_window_pixel_formats;
+PIXELFORMATDESCRIPTOR pixel_format_desc;
+MSG window_message;
+
+u32 sprite_index_buffer;
+u32 sprite_vertex_buffer;
+u32 sprite_positions_buffer;
+u32 sprite_shader;
+
+u32 test_texture;
+u32 atlas_texture;
+
+u64 tick_count;
+u64 start_tick_count;
+u64 ticks_per_second;
+f32 time;
+f32 time_since_simulation;
+f32 last_simulation_time = -1.f;
+f32 time_since_render;
+f32 last_render_time = -1.f;
+u64 simulation_count = 0;
+u64 frame_count = 0;
+f32 last_printf_time = 0.f;
+
+char sprite_vertex_shader_source[0x10000];
+u32 sprite_vertex_shader_source_update_time;
+u32 sprite_vertex_shader_source_size;
+
+char sprite_fragment_shader_source[0x10000];
+u32 sprite_fragment_shader_source_size;
+u32 sprite_fragment_shader_source_update_time;
+u32 sprite_fragment_shader_source_size;
+
+const ShaderAttribute sprite_shader_attributes[MAX_SHADER_ATTRIBUTES] = {
+	{.type = TYPE_ID_FLOAT, .count = 2},
+	{.type = TYPE_ID_FLOAT, .count = 3},
+	{.type = TYPE_ID_FLOAT, .count = 2},
+	{.type = TYPE_ID_FLOAT, .count = 2},
+};
+
+char atlas_texture_buffer[0x10000];
+u32 atlas_texture_update_time;
+u32 atlas_texture_size;
+
+HMODULE module_handle;
+
+void init_window()
 {
-	v2f r;
-	r.x = v->x + x;
-	r.y = v->y + y;
-	return r;
+	WNDCLASSEXA window_class = {
+		.cbSize = sizeof(WNDCLASSEXA),
+		.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
+		.lpfnWndProc = window_proc,
+		.hInstance = module_handle,
+		.hCursor = LoadCursor(0, IDC_ARROW),
+		.lpszClassName = WINDOW_TITLE
+	};
+
+	i32 pixel_format_attributes[] = {
+		WGL_DRAW_TO_WINDOW_ARB, 1,
+		WGL_SUPPORT_OPENGL_ARB, 1,
+		WGL_DOUBLE_BUFFER_ARB, 1,
+		WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
+		WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+		WGL_COLOR_BITS_ARB, 32,
+		WGL_DEPTH_BITS_ARB, 24,
+		WGL_STENCIL_BITS_ARB, 8,
+		0
+	};
+
+	i32 gl_attributes[] = {
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+		0,
+	};
+
+	dcheck(RegisterClassExA(&window_class));
+
+	dcheck(window_handle = CreateWindowExA(0, WINDOW_CLASS_NAME, WINDOW_TITLE,
+		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+		WINDOW_DEFAULT_WIDTH, WINDOW_DEFAULT_HEIGHT, 0, 0, module_handle, 0));
+
+	dcheck(device_context = GetDC(window_handle));
+
+	dcheck(wglChoosePixelFormatARB(device_context, pixel_format_attributes, 0, 1, &window_pixel_format, &num_window_pixel_formats));
+
+	dcheck(DescribePixelFormat(device_context, window_pixel_format, sizeof(pixel_format_desc), &pixel_format_desc));
+
+	dcheck(SetPixelFormat(device_context, window_pixel_format, &pixel_format_desc));
+
+	dcheck(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
+	dcheck(wglMakeCurrent(device_context, rendering_context));
+
+	disable_vsync();
+
+	ShowWindow(window_handle, SW_NORMAL);
 }
 
-inline v2f add_v2f_v2f(const v2f* v, const v2f* v2)
+void init_gl()
 {
-	v2f r;
-	r.x = v->x + v2->x;
-	r.y = v->y + v2->y;
-	return r;
-}
-
-void draw_sprite_at_screenpos(const v2f* origin)
-{
-
-}
-
-void render_world()
-{
-
-	SpriteVertex* sprite_vertex;
-
-	sprite_vertex = &sprite_vertices[num_sprite_vertices];
-	sprite_vertex->position = TOP_LEFT_NDC_V2F;
-	sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	sprite_vertex++;
-
-	sprite_vertex->position = TOP_RIGHT_NDC_V2F;
-	sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	sprite_vertex++;
-
-	sprite_vertex->position = BOT_LEFT_NDC_V2F;
-	sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	sprite_vertex++;
-
-	sprite_vertex->position = BOT_RIGHT_NDC_V2F;
-	sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	num_sprite_vertices += VERTICES_PER_SPRITE;
-	num_sprite_indices += INDICES_PER_SPRITE;
-}
-
-int main(int argc, const char** argv)
-{
-	HWND dummy_window_handle;
-	HDC dummy_device_context;
-	int dummy_pixel_format;
-	HGLRC dummy_rendering_context;
-
-	HWND window_handle;
-	HDC device_context;
-	HGLRC rendering_context;
-	i32 window_pixel_format;
-	UINT num_window_pixel_formats;
-	PIXELFORMATDESCRIPTOR pixel_format_desc;
-	u32 sprite_index_buffer;
-	u32 sprite_vertex_buffer;
-	u32 sprite_shader;
-	u32 test_texture;
-	MSG window_message;
-	u64 tick_count;
-	u64 start_tick_count;
-	u64 ticks_per_second;
-	f32 time;
-	f32 time_since_simulation;
-	f32 last_simulation_time = -1.f;
-	f32 time_since_render;
-	f32 last_render_time = -1.f;
-	u64 simulation_count = 0;
-	u64 frame_count = 0;
-	f32 last_printf_time = 0.f;
-
-	HMODULE module_handle;
-
-	dcheck(module_handle = GetModuleHandle(nullptr));
-	dcheck(opengl_module = LoadLibraryA("opengl32.dll"));
-
 	WNDCLASSEXA dummy_window_class = {
 		.cbSize = sizeof(WNDCLASSEXA),
 		.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
@@ -699,6 +773,8 @@ int main(int argc, const char** argv)
 		.cStencilBits = 8,
 		.iLayerType = PFD_MAIN_PLANE,
 	};
+
+	dcheck(opengl_module = LoadLibraryA("opengl32.dll"));
 
 	dcheck(RegisterClassExA(&dummy_window_class));
 
@@ -755,6 +831,9 @@ int main(int argc, const char** argv)
 	dcheck(glLoadIdentity = gl_get_proc_address("glLoadIdentity"));
 	dcheck(glRotatef = gl_get_proc_address("glRotatef"));
 	dcheck(glOrtho = gl_get_proc_address("glOrtho"));
+	dcheck(glBindBufferBase = gl_get_proc_address("glBindBufferBase"));
+	dcheck(glMapBuffer = gl_get_proc_address("glMapBuffer"));
+	dcheck(glUnmapBuffer = gl_get_proc_address("glUnmapBuffer"));
 
 	dcheck(wglMakeCurrent(dummy_device_context, 0));
 
@@ -763,56 +842,10 @@ int main(int argc, const char** argv)
 	dcheck(ReleaseDC(dummy_window_handle, dummy_device_context));
 
 	dcheck(DestroyWindow(dummy_window_handle));
+}
 
-	WNDCLASSEXA window_class = {
-		.cbSize = sizeof(WNDCLASSEXA),
-		.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-		.lpfnWndProc = window_proc,
-		.hInstance = module_handle,
-		.hCursor = LoadCursor(0, IDC_ARROW),
-		.lpszClassName = WINDOW_TITLE
-	};
-
-	i32 pixel_format_attributes[] = {
-		WGL_DRAW_TO_WINDOW_ARB, 1,
-		WGL_SUPPORT_OPENGL_ARB, 1,
-		WGL_DOUBLE_BUFFER_ARB, 1,
-		WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
-		WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
-		WGL_COLOR_BITS_ARB, 32,
-		WGL_DEPTH_BITS_ARB, 24,
-		WGL_STENCIL_BITS_ARB, 8,
-		0
-	};
-
-	i32 gl_attributes[] = {
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
-		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-		0,
-	};
-
-	dcheck(RegisterClassExA(&window_class));
-
-	dcheck(window_handle = CreateWindowExA(0, WINDOW_CLASS_NAME, WINDOW_TITLE,
-		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-		WINDOW_DEFAULT_WIDTH, WINDOW_DEFAULT_HEIGHT, 0, 0, module_handle, 0));
-
-	dcheck(device_context = GetDC(window_handle));
-
-	dcheck(wglChoosePixelFormatARB(device_context, pixel_format_attributes, 0, 1, &window_pixel_format, &num_window_pixel_formats));
-
-	dcheck(DescribePixelFormat(device_context, window_pixel_format, sizeof(pixel_format_desc), &pixel_format_desc));
-
-	dcheck(SetPixelFormat(device_context, window_pixel_format, &pixel_format_desc));
-
-	dcheck(rendering_context = wglCreateContextAttribsARB(device_context, 0, gl_attributes));
-	dcheck(wglMakeCurrent(device_context, rendering_context));
-
-	disable_vsync();
-
-	ShowWindow(window_handle, SW_NORMAL);
-
+void init_rendering()
+{
 	for(u32 i = 0, j = 0;
 		i < MAX_SPRITE_INDICES - INDICES_PER_SPRITE;
 		i += INDICES_PER_SPRITE, j += VERTICES_PER_SPRITE)
@@ -829,113 +862,176 @@ int main(int argc, const char** argv)
 
 	dcheck(sprite_index_buffer = create_index_buffer(SPRITE_INDEX_BUFFER_SIZE, true, sprite_indices));
 	dcheck(sprite_vertex_buffer = create_vertex_buffer(SPRITE_VERTEX_BUFFER_SIZE, false, nullptr));
-	dcheck(sprite_shader = create_shader(sprite_vertex_shader, sprite_fragment_shader, sprite_shader_attributes));
+	dcheck(sprite_positions_buffer = create_storage_buffer(sizeof(entity_positions), false, nullptr));
+	dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
 	dcheck(use_shader(sprite_shader));
 	dcheck(test_texture = create_texture(TEXTURE_SPRITE_ATLAS));
 	dcheck(bind_texture(test_texture));
 
 	end_gl_setup();
+}
 
-	entity_flags[entity_count] |= HAS_POSITION | HAS_TEXTURE;
-	entity_count++;
+void render_world()
+{
+	SpriteVertex* sprite_vertex;
 
+	sprite_vertex = &sprite_vertices[num_sprite_vertices];
+	sprite_vertex->position = TOP_LEFT_NDC_V2F;
+	sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	sprite_vertex++;
+
+	sprite_vertex->position = TOP_RIGHT_NDC_V2F;
+	sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	sprite_vertex++;
+
+	sprite_vertex->position = BOT_LEFT_NDC_V2F;
+	sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	sprite_vertex++;
+
+	sprite_vertex->position = BOT_RIGHT_NDC_V2F;
+	sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
+	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
+	sprite_vertex->color = WHITE;
+
+	num_sprite_vertices += VERTICES_PER_SPRITE;
+	num_sprite_indices += INDICES_PER_SPRITE;
+}
+
+void process_window_messages()
+{
+	while(PeekMessage(&window_message, window_handle, 0, 0, PM_REMOVE) > 0)
+	{
+		TranslateMessage(&window_message);
+		DispatchMessage(&window_message);
+	}
+}
+
+void render()
+{
+	num_sprite_vertices = 0, num_sprite_indices = 0;
+
+	render_world();
+
+	clear_background();
+
+	write_storage_buffer(sprite_positions_buffer, entity_positions, sizeof(*entity_positions) * entity_count);
+
+	draw_triangles(3);
+
+	SwapBuffers(device_context);
+}
+
+void simulate()
+{
+	for(u64 entity = 0; entity < entity_count; entity++)
+	{
+		if(entity_flags[entity] & HAS_POSITION)
+		{
+			entity_positions[entity].x = 0; //(f32)window_width * 0.5f;
+			entity_positions[entity].y = 0; //(f32)window_height * 0.5f;
+		}
+	}
+}
+
+void hot_reload()
+{
+	if(load_if_updated("./atlas.png", atlas_texture_buffer, sizeof(atlas_texture_buffer), &atlas_texture_update_time, &atlas_texture_size))
+	{
+		//Workaround because stbi has no direct way to load from memory
+		u32 width, height, num_channels;
+		const void* data;
+		dcheck(data = stbi_load("./atlas.png", &width, &height, &num_channels, 0));
+		dcheck(atlas_texture = create_texture_from_memory(data, width, height, num_channels));
+		dcheck(bind_texture(atlas_texture));
+	}
+
+	if(load_if_updated("./sprite.vert", sprite_vertex_shader_source, sizeof(sprite_vertex_shader_source),
+		&sprite_vertex_shader_source_update_time, &sprite_vertex_shader_source_size))
+	{
+		sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes);
+	}
+
+	if(load_if_updated("./sprite.frag", sprite_fragment_shader_source, sizeof(sprite_fragment_shader_source),
+		&sprite_fragment_shader_source_update_time, &sprite_fragment_shader_source_size))
+	{
+		sprite_shader = create_shader(sprite_fragment_shader_source, sprite_fragment_shader_source, sprite_shader_attributes);
+	}
+}
+
+void init_timers()
+{
 	dcheck(ticks_per_second = get_ticks_per_second());
 	dcheck(start_tick_count = get_tick_count());
+}
+
+void init_world()
+{
+	entity_flags[entity_count] |= HAS_POSITION | HAS_TEXTURE;
+	entity_count++;
+}
+
+void update_timers()
+{
+	dcheck(tick_count = get_tick_count());
+
+	time = (f32) (tick_count - start_tick_count) / (f32) ticks_per_second;
+
+	time_since_simulation = time - last_simulation_time;
+
+	time_since_render = time - last_render_time;
+}
+
+int main(int argc, const char** argv)
+{
+	dcheck(module_handle = GetModuleHandle(nullptr));
+
+	dcheck(load_if_updated("./sprite.vert", sprite_vertex_shader_source, sizeof(sprite_vertex_shader_source),
+		&sprite_vertex_shader_source_update_time, &sprite_vertex_shader_source_size));
+
+	dcheck(load_if_updated("./sprite.frag", sprite_fragment_shader_source, sizeof(sprite_fragment_shader_source),
+		&sprite_fragment_shader_source_update_time, &sprite_fragment_shader_source_size));
+
+	dcheck(load_if_updated("./atlas.png", atlas_texture_buffer, sizeof(atlas_texture_buffer),
+		&atlas_texture_update_time, &atlas_texture_size));
+
+	init_gl();
+
+	init_window();
+
+	init_rendering();
+
+	init_world();
+
+	init_timers();
 
 	while(true)
 	{
-		while(PeekMessage(&window_message, window_handle, 0, 0, PM_REMOVE) > 0)
-		{
-			TranslateMessage(&window_message);
-			DispatchMessage(&window_message);
-		}
+		process_window_messages();
 
-		dcheck(tick_count = get_tick_count());
+		hot_reload();
 
-		time = (f32) (tick_count - start_tick_count) / (f32) ticks_per_second;
-
-		time_since_simulation = time - last_simulation_time;
+		update_timers();
 
 		if(time_since_simulation >= SIMULATION_TIME_INTERVAL)
 		{
-			for(u64 entity = 0; entity < entity_count; entity++)
-			{
-				if(entity_flags[entity] & HAS_POSITION)
-				{
-					entity_positions[entity].x += 1.f;
-					entity_positions[entity].y += 1.f;
-					//entity_positions[entity].z += 1.;
-				}
-			}
+			simulate();
 
 			simulation_count++;
 			last_simulation_time = time;
 		}
 
-		time_since_render = time - last_render_time;
-
 		if(time_since_render >= RENDER_TIME_INTERVAL)
 		{
-
-			for(u64 entity = 0; entity < entity_count; entity++)
-			{
-				if(entity_flags[entity] & HAS_TEXTURE && entity_flags[entity] & HAS_POSITION)
-				{
-					SpriteVertex* sprite_vertex = &sprite_vertices[num_sprite_vertices];
-
-					const f32 ndc_width_per_pixel = 2.f / (f32) window_width;
-					const f32 offset = ndc_width_per_pixel * 6;
-
-					const v2f TILE_TOP_LEFT_TEX_V2F = {0.0f, offset};
-					const v2f TILE_TOP_RIGHT_TEX_V2F = {offset, offset};
-					const v2f TILE_BOT_LEFT_TEX_V2F = {0.0f, 0.0f};
-					const v2f TILE_BOT_RIGHT_TEX_V2F = {offset, 0.0f};
-
-					const float texture_width = 30.f * ndc_width_per_pixel;
-					const float texture_height = 30.f * ndc_width_per_pixel;
-
-					v2f ndc_origin;
-					dcheck(world_to_ndc_v2f(&entity_positions[entity], &ndc_origin));
-
-					sprite_vertex->position = add_v2f(&ndc_origin, -texture_width, -texture_width);
-					sprite_vertex->texture_offset = TILE_TOP_LEFT_TEX_V2F;
-					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-					sprite_vertex->color = WHITE;
-
-					sprite_vertex++;
-
-					sprite_vertex->position = add_v2f(&ndc_origin, texture_width, -texture_height);
-					sprite_vertex->texture_offset = TILE_TOP_RIGHT_TEX_V2F;
-					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-					sprite_vertex->color = WHITE;
-
-					sprite_vertex++;
-
-					sprite_vertex->position = add_v2f(&ndc_origin, -texture_width, texture_height);
-					sprite_vertex->texture_offset = TILE_BOT_LEFT_TEX_V2F;
-					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-					sprite_vertex->color = WHITE;
-
-					sprite_vertex++;
-
-					sprite_vertex->position = add_v2f(&ndc_origin, texture_width, texture_height);
-					sprite_vertex->texture_offset = TILE_BOT_RIGHT_TEX_V2F;
-					sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-					sprite_vertex->color = WHITE;
-
-					num_sprite_vertices += VERTICES_PER_SPRITE;
-					num_sprite_indices += INDICES_PER_SPRITE;
-
-				}
-			}
-
-			clear_background();
-
-			write_vertex_buffer(sprite_vertex_buffer, sprite_vertices, num_sprite_vertices * sizeof(SpriteVertex));
-
-			draw_triangles(num_sprite_indices);
-
-			SwapBuffers(device_context);
+			render();
 
 			frame_count++;
 			last_render_time = time;
@@ -950,7 +1046,5 @@ int main(int argc, const char** argv)
 
 			last_printf_time = time;
 		}
-
-		num_sprite_vertices = 0, num_sprite_indices = 0;
 	}
 }
