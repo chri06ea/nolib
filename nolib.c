@@ -296,7 +296,7 @@ u32 compile_shader(const char* shader_source, const char* shader_type)
 	{
 		gl_dcheck(glGetShaderInfoLog(shader, 512, NULL, compilation_log));
 		TRACE(compilation_log);
-		dcheck(false);
+		return 0;
 	};
 	return shader;
 }
@@ -343,10 +343,10 @@ u8 use_shader(u32 shader)
 	return true;
 }
 
-u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_source, const ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
+
+
+u32 create_shader_program(u32 vertex_shader, u32 fragment_shader, const ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
 {
-	u32 fragment_shader = compile_shader(vertex_shader_source, "vertex");
-	u32 vertex_shader = compile_shader(fragment_shader_source, "fragment");
 	u32 program = glCreateProgram();
 
 	gl_dcheck(glAttachShader(program, vertex_shader));
@@ -368,6 +368,17 @@ u32 create_shader(const char* vertex_shader_source, const char* fragment_shader_
 	setup_vertex_attributes(program, attributes);
 
 	return program;
+}
+
+u32 create_shader_program_from_source(const char* vertex_shader_source, const char* fragment_shader_source, const ShaderAttribute attributes[MAX_SHADER_ATTRIBUTES])
+{
+	u32 vertex_shader = compile_shader(vertex_shader_source, "vertex");
+	u32 fragment_shader = compile_shader(fragment_shader_source, "fragment");
+
+	if(!vertex_shader || !fragment_shader)
+		return 0;
+
+	return create_shader_program(vertex_shader, fragment_shader, attributes);
 }
 
 #define TEXTURE_WALL 1
@@ -878,7 +889,7 @@ void init_rendering()
 	dcheck(sprite_index_buffer = create_index_buffer(SPRITE_INDEX_BUFFER_SIZE, true, sprite_indices));
 	dcheck(sprite_vertex_buffer = create_vertex_buffer(SPRITE_VERTEX_BUFFER_SIZE, false, nullptr));
 	dcheck(sprite_positions_buffer = create_storage_buffer(sizeof(entity_positions), false, nullptr));
-	dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
+	dcheck(sprite_shader = create_shader_program_from_source(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
 	dcheck(use_shader(sprite_shader));
 	{
 		//temp workaround because stbi has no direct way to load from memory
@@ -986,15 +997,19 @@ void hot_reload()
 	if(load_if_updated("./sprite.vert", sprite_vertex_shader_source, sizeof(sprite_vertex_shader_source),
 		&sprite_vertex_shader_source_update_time, &sprite_vertex_shader_source_size))
 	{
-		dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
-		dcheck(use_shader(sprite_shader));
+		u32 new_sprite_shader = create_shader_program_from_source(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes);
+
+		if(new_sprite_shader)
+			dcheck(use_shader(new_sprite_shader));
 	}
 
 	if(load_if_updated("./sprite.frag", sprite_fragment_shader_source, sizeof(sprite_fragment_shader_source),
 		&sprite_fragment_shader_source_update_time, &sprite_fragment_shader_source_size))
 	{
-		dcheck(sprite_shader = create_shader(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
-		dcheck(use_shader(sprite_shader));
+		u32 new_sprite_shader = create_shader_program_from_source(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes);
+
+		if(new_sprite_shader)
+			dcheck(use_shader(new_sprite_shader));
 	}
 }
 

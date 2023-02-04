@@ -14,5 +14,5 @@ void main()
 	if(textureColor.a == 0.0)
 		discard;
 
-	color = vec4(1, 1, 1, 1) * textureColor;  
+	color = vec4(0, 1, 1, 0) * textureColor;  
 };
