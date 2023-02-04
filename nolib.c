@@ -881,7 +881,7 @@ void init_rendering()
 
 		sprite_indices[i + 3] = j + 2;
 		sprite_indices[i + 4] = j + 3;
-		sprite_indices[i + 5] = j + 0;
+		sprite_indices[i + 5] = j + 1;
 	}
 
 	begin_gl_setup();
@@ -960,11 +960,12 @@ void render()
 		-0.8f, -0.8f,
 		-0.8f, +0.8f,
 		+0.8f, +0.8f,
+		+0.8f, -0.8f,
 	};
 
 	write_storage_buffer(sprite_positions_buffer, verts, sizeof(verts));
 
-	draw_triangles(3);
+	draw_triangles(6);
 
 	SwapBuffers(device_context);
 }

@@ -9,18 +9,12 @@ out vec2 _tex_coords;
 
 void main()														
 {		
-	float textureCoords[6] = 
+	vec2 textureCoords2[4] = 
     {
-		0, 0,
-		1.0, 1.0,
-		1.0, 1.0
-    };
-
-	vec2 textureCoords2[3] = 
-    {
-		vec2(0.0, 0.0),
-		vec2(0.0, 10.0),
-		vec2(10.0, 10.0)
+		vec2(2.0, 2.0),
+		vec2(2.0, 13.0),
+		vec2(13.0, 13.0),
+		vec2(13.0, 2.0),
     };
 
 	vec2 tex_coords = textureCoords2[gl_VertexID];
