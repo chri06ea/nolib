@@ -5,7 +5,6 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "nolib.h"
 
 #pragma comment(lib, "opengl32.lib")
 
@@ -687,7 +686,7 @@ MSG window_message;
 
 u32 sprite_index_buffer;
 u32 sprite_vertex_buffer;
-u32 sprite_positions_buffer;
+u32 sprite_shader_sprite_sbo;
 u32 sprite_shader;
 
 u32 test_texture;
@@ -721,6 +720,16 @@ const ShaderAttribute sprite_shader_attributes[MAX_SHADER_ATTRIBUTES] = {
 char atlas_texture_buffer[0x10000];
 u32 atlas_texture_update_time;
 u32 atlas_texture_size;
+
+typedef struct 
+{
+	v2f pos;
+	s2f size;
+	v2f atlas_offset;
+} Sprite;
+
+Sprite sprites[0x1000];
+u32 num_sprites = 0;
 
 HMODULE module_handle;
 
@@ -879,16 +888,16 @@ void init_rendering()
 		sprite_indices[i + 1] = j + 1;
 		sprite_indices[i + 2] = j + 2;
 
-		sprite_indices[i + 3] = j + 2;
-		sprite_indices[i + 4] = j + 3;
+		sprite_indices[i + 3] = j + 3;
+		sprite_indices[i + 4] = j + 2;
 		sprite_indices[i + 5] = j + 1;
 	}
 
 	begin_gl_setup();
 
 	dcheck(sprite_index_buffer = create_index_buffer(SPRITE_INDEX_BUFFER_SIZE, true, sprite_indices));
-	dcheck(sprite_vertex_buffer = create_vertex_buffer(SPRITE_VERTEX_BUFFER_SIZE, false, nullptr));
-	dcheck(sprite_positions_buffer = create_storage_buffer(sizeof(entity_positions), false, nullptr));
+	//dcheck(sprite_vertex_buffer = create_vertex_buffer(SPRITE_VERTEX_BUFFER_SIZE, false, nullptr));
+	dcheck(sprite_shader_sprite_sbo = create_storage_buffer(sizeof(sprites), false, nullptr));
 	dcheck(sprite_shader = create_shader_program_from_source(sprite_vertex_shader_source, sprite_fragment_shader_source, sprite_shader_attributes));
 	dcheck(use_shader(sprite_shader));
 	{
@@ -948,6 +957,7 @@ void process_window_messages()
 	}
 }
 
+
 void render()
 {
 	num_sprite_vertices = 0, num_sprite_indices = 0;
@@ -956,16 +966,22 @@ void render()
 
 	clear_background();
 
-	float verts[] = {
-		-0.8f, -0.8f,
-		-0.8f, +0.8f,
-		+0.8f, -0.8f,
-		+0.8f, +0.8f,
-	};
+	sprites[0].pos.x=0.f;
+	sprites[0].pos.y=0.f;
+	sprites[0].atlas_offset.x=16.f;
+	sprites[0].atlas_offset.y=16.f;
+	sprites[0].size.w=16.f;
+	sprites[0].size.h=16.f;
 
-	write_storage_buffer(sprite_positions_buffer, verts, sizeof(verts));
+	sprites[1].pos.x=0.f;
+	sprites[1].pos.y=0.f;
+	sprites[1].atlas_offset.x=16.f;
+	sprites[1].atlas_offset.y=16.f;
+	sprites[1].size.w=5.f;
+	sprites[1].size.h=5.f;
 
-	draw_triangles(6);
+	write_storage_buffer(sprite_shader_sprite_sbo, sprites, sizeof(sprites));
+	draw_triangles(12);
 
 	SwapBuffers(device_context);
 }

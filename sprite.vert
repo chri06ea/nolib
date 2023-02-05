@@ -1,30 +1,51 @@
 #version 430 core					
 
-layout(std430, binding = 0) buffer VertexData
+out vec2 _uv;
+out vec4 _color;
+
+struct Sprite
 {
-    vec2 vertices[];
+	vec2 pos;
+	vec2 size;
+	vec2 atlas_offset;
 };
 
-out vec2 _tex_coords;
+layout(std430, binding = 0) buffer VertexData
+{
+    Sprite sprites[];
+};
 
 void main()														
 {		
-	float tx = 0;
-	float ty = 0;
-	float tw = 32;
-	float th = 32;
+	int vertex_index = gl_VertexID % 4;
+	int sprite_index = gl_VertexID / 4;
 
-	vec2 textureCoords2[4] = 
+	Sprite s = sprites[1];
+
+	float tx = s.pos.x;
+	float ty = s.pos.y;
+	float tw = s.size.x;
+	float th = s.size.x;
+
+	vec2 uvs[4] = 
     {
-		vec2(tx, ty + th),
 		vec2(tx, ty),
-		vec2(tx + tw, ty + th),
 		vec2(tx + tw, ty),
+		vec2(tx, ty + th),
+		vec2(tx + tw, ty + th),
     };
 
-	vec2 tex_coords = textureCoords2[gl_VertexID];
+	vec2 vertices[4] = 
+	{
+		vec2(-0.8, +0.8), // TL
+		vec2(+0.8, +0.8), // TR
+		vec2(-0.8, -0.8), // BL
+		vec2(+0.8, -0.8), // BR
+	};
 
-	_tex_coords = tex_coords;
+	_uv = uvs[vertex_index];
+	
+	_color = vec4(1,1,1,1);
 
-	gl_Position = vec4(vertices[gl_VertexID], 0, 1);
+	gl_Position = vec4(vertices[vertex_index], 0, 1);
 };
