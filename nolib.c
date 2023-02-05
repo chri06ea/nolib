@@ -96,14 +96,6 @@ inline v2f add_v2f_v2f(const v2f* v, const v2f* v2)
 
 #define MAX_SHADER_ATTRIBUTES 15
 
-#define WINDOW_TITLE "hehe"
-#define WINDOW_CLASS_NAME "hehe"
-#define WINDOW_DEFAULT_WIDTH 800
-#define WINDOW_DEFAULT_HEIGHT 800
-
-#define DUMMY_WINDOW_TITLE "_dummy"
-#define DUMMY_WINDOW_CLASS_NAME "_dummy"
-
 static_assert(VERTICES_PER_SPRITE% MAX_SPRITE_VERTICES == 0, "Unaligned vertex buffer");
 static_assert(INDICES_PER_SPRITE% MAX_SPRITE_INDICES == 0, "Unaligned index  buffer");
 
@@ -235,20 +227,6 @@ typedef struct {
 	u32 type;
 	u32 count;
 } ShaderAttribute;
-
-const v2f TOP_LEFT_NDC_V2F = {-1.f, -1.f};
-const v2f TOP_RIGHT_NDC_V2F = {+1.f, -1.f};
-const v2f BOT_LEFT_NDC_V2F = {-1.f, +1.f};
-const v2f BOT_RIGHT_NDC_V2F = {+1.f, +1.f};
-
-v2f TOP_LEFT_TEX_V2F = {0, 1.f};
-v2f TOP_RIGHT_TEX_V2F = {1.f, 1.f};
-v2f BOT_LEFT_TEX_V2F = {0.f, 0.f};
-v2f BOT_RIGHT_TEX_V2F = {1.f, 0.f};
-
-const s2f TEX_ATLAS_SIZE = {1000.f, 1000.f};
-
-const c3f WHITE = {1.f, 1.f, 1.f};
 
 HMODULE opengl_module;
 
@@ -543,51 +521,6 @@ void set_viewport(u32 x, u32 y, u32 w, u32 h)
 	glViewport(x, y, w, h);
 }
 
-typedef struct {
-	v2f position;
-	c3f color;
-	v2f texture_offset;
-	s2f texture_size;
-} SpriteVertex;
-
-SpriteVertex sprite_vertices[MAX_SPRITE_VERTICES];
-i64 num_sprite_vertices = 0;
-
-u32 sprite_indices[MAX_SPRITE_INDICES];
-i32 num_sprite_indices = 0;
-
-u32 window_width = WINDOW_DEFAULT_WIDTH, window_height = WINDOW_DEFAULT_HEIGHT;
-u32 world_width = WINDOW_DEFAULT_WIDTH, world_height = WINDOW_DEFAULT_HEIGHT;
-
-u32 entity_count = 0;
-u64 entity_flags[MAX_ENTITIES];
-v3f entity_positions[MAX_ENTITIES];
-
-f32 vertices[MAX_SPRITE_VERTICES];
-u32 num_vertices;
-
-u32 indices[MAX_SPRITE_VERTICES];
-u32 max_vertices;
-
-#define SIMULATIONS_PER_SECOND 64
-#define SIMULATION_TIME_INTERVAL (1.f / (f32)SIMULATIONS_PER_SECOND)
-#define RENDER_TIME_INTERVAL SIMULATION_TIME_INTERVAL
-
-inline u8 screen_to_ndc_v2f(const v2f* screen_pos, v2f* ndc_pos)
-{
-	ndc_pos->x = ((screen_pos->x / window_width) * 2) - 1.f;
-	ndc_pos->y = ((screen_pos->y / window_height) * 2) - 1.f;
-
-	return true;
-}
-
-inline u8 world_to_ndc_v2f(const v3f* world_pos, v2f* ndc_pos)
-{
-	ndc_pos->x = ((world_pos->x / world_width) * 2) - 1.f;
-	ndc_pos->y = ((world_pos->y / world_height) * 2) - 1.f;
-
-	return true;
-}
 
 inline u64 get_tick_count()
 {
@@ -646,6 +579,18 @@ u8 load_if_updated(const char* path, void* buffer, u32 buffer_size, u32* time_ch
 	return false;
 }
 
+
+#define WINDOW_TITLE "hehe"
+#define WINDOW_CLASS_NAME "hehe"
+#define WINDOW_DEFAULT_WIDTH 800
+#define WINDOW_DEFAULT_HEIGHT 800
+
+#define DUMMY_WINDOW_TITLE "_dummy"
+#define DUMMY_WINDOW_CLASS_NAME "_dummy"
+
+u32 window_width = WINDOW_DEFAULT_WIDTH, window_height = WINDOW_DEFAULT_HEIGHT;
+u32 world_width = WINDOW_DEFAULT_WIDTH, world_height = WINDOW_DEFAULT_HEIGHT;
+
 LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
 {
 	LRESULT result = 0;
@@ -671,6 +616,10 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 	return result;
 }
 
+#define SIMULATIONS_PER_SECOND 64
+#define SIMULATION_TIME_INTERVAL (1.f / (f32)SIMULATIONS_PER_SECOND)
+#define RENDER_TIME_INTERVAL SIMULATION_TIME_INTERVAL
+
 HWND dummy_window_handle;
 HDC dummy_device_context;
 int dummy_pixel_format;
@@ -685,12 +634,16 @@ PIXELFORMATDESCRIPTOR pixel_format_desc;
 MSG window_message;
 
 u32 sprite_index_buffer;
-u32 sprite_vertex_buffer;
 u32 sprite_shader_sprite_sbo;
 u32 sprite_shader;
 
-u32 test_texture;
 u32 atlas_texture;
+
+u32 sprite_indices[MAX_SPRITE_INDICES];
+
+u32 entity_count = 0;
+u64 entity_flags[MAX_ENTITIES];
+v3f entity_positions[MAX_ENTITIES];
 
 u64 tick_count;
 u64 start_tick_count;
@@ -705,13 +658,12 @@ u64 frame_count = 0;
 f32 last_printf_time = 0.f;
 
 char sprite_vertex_shader_source[0x10000];
-u32 sprite_vertex_shader_source_update_time;
 u32 sprite_vertex_shader_source_size;
+u32 sprite_vertex_shader_source_update_time;
 
 char sprite_fragment_shader_source[0x10000];
 u32 sprite_fragment_shader_source_size;
 u32 sprite_fragment_shader_source_update_time;
-u32 sprite_fragment_shader_source_size;
 
 const ShaderAttribute sprite_shader_attributes[MAX_SHADER_ATTRIBUTES] = {
 	{.type = TYPE_ID_FLOAT, .count = 0},
@@ -728,6 +680,7 @@ typedef struct
 	v2f atlas_offset;
 	double scale; // TODO: Figure out why this only works with double
 } Sprite;
+
 Sprite sprites[0x1000];
 u32 num_sprites = 0;
 
@@ -913,41 +866,6 @@ void init_rendering()
 	end_gl_setup();
 }
 
-void render_world()
-{
-	SpriteVertex* sprite_vertex;
-
-	sprite_vertex = &sprite_vertices[num_sprite_vertices];
-	sprite_vertex->position = TOP_LEFT_NDC_V2F;
-	sprite_vertex->texture_offset = TOP_LEFT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	sprite_vertex++;
-
-	sprite_vertex->position = TOP_RIGHT_NDC_V2F;
-	sprite_vertex->texture_offset = TOP_RIGHT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	sprite_vertex++;
-
-	sprite_vertex->position = BOT_LEFT_NDC_V2F;
-	sprite_vertex->texture_offset = BOT_LEFT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	sprite_vertex++;
-
-	sprite_vertex->position = BOT_RIGHT_NDC_V2F;
-	sprite_vertex->texture_offset = BOT_RIGHT_TEX_V2F;
-	sprite_vertex->texture_size = TEX_ATLAS_SIZE;
-	sprite_vertex->color = WHITE;
-
-	num_sprite_vertices += VERTICES_PER_SPRITE;
-	num_sprite_indices += INDICES_PER_SPRITE;
-}
-
 void process_window_messages()
 {
 	while(PeekMessage(&window_message, window_handle, 0, 0, PM_REMOVE) > 0)
@@ -957,13 +875,8 @@ void process_window_messages()
 	}
 }
 
-
 void render()
 {
-	num_sprite_vertices = 0, num_sprite_indices = 0;
-
-	render_world();
-
 	clear_background();
 
 	sprites[0].pos.x = 10.f;
