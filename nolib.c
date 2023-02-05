@@ -721,13 +721,13 @@ char atlas_texture_buffer[0x10000];
 u32 atlas_texture_update_time;
 u32 atlas_texture_size;
 
-typedef struct 
+typedef struct
 {
 	v2f pos;
 	s2f size;
 	v2f atlas_offset;
+	double scale; // TODO: Figure out why this only works with double
 } Sprite;
-
 Sprite sprites[0x1000];
 u32 num_sprites = 0;
 
@@ -966,29 +966,32 @@ void render()
 
 	clear_background();
 
-	sprites[0].pos.x= 0.f;
-	sprites[0].pos.y= 0.f;
-	sprites[0].size.w=16.f;
-	sprites[0].size.h=16.f;
-	sprites[0].atlas_offset.x=0.f;
-	sprites[0].atlas_offset.y=0.f;
+	sprites[0].pos.x = 10.f;
+	sprites[0].pos.y = 10.f;
+	sprites[0].size.w = 16.f;
+	sprites[0].size.h = 16.f;
+	sprites[0].atlas_offset.x = 0.f;
+	sprites[0].atlas_offset.y = 0.f;
+	sprites[0].scale = 15.f;
 
-	sprites[1].pos.x=16.f;
-	sprites[1].pos.y=16.f;
-	sprites[1].size.w=16.f;
-	sprites[1].size.h=16.f;
-	sprites[1].atlas_offset.x=0;
-	sprites[1].atlas_offset.y=16;
+	sprites[1].pos.x = 216.f;
+	sprites[1].pos.y = 216.f;
+	sprites[1].size.w = 16.f;
+	sprites[1].size.h = 16.f;
+	sprites[1].atlas_offset.x = 0;
+	sprites[1].atlas_offset.y = 16;
+	sprites[1].scale = 10.f;
 
-	sprites[2].pos.x=0.f;
-	sprites[2].pos.y=0.f;
-	sprites[2].size.w=16.f;
-	sprites[2].size.h=16.f;
-	sprites[2].atlas_offset.x=16;
-	sprites[2].atlas_offset.y=0;
+	sprites[2].pos.x = 50.f;
+	sprites[2].pos.y = 400.f;
+	sprites[2].size.w = 16.f;
+	sprites[2].size.h = 16.f;
+	sprites[2].atlas_offset.x = 16;
+	sprites[2].atlas_offset.y = 0;
+	sprites[2].scale = 15.f;
 
 	write_storage_buffer(sprite_shader_sprite_sbo, sprites, sizeof(sprites));
-	draw_triangles(12);
+	draw_triangles(18);
 
 	SwapBuffers(device_context);
 }
