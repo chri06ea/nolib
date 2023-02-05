@@ -966,19 +966,26 @@ void render()
 
 	clear_background();
 
-	sprites[0].pos.x=0.f;
-	sprites[0].pos.y=0.f;
-	sprites[0].atlas_offset.x=16.f;
-	sprites[0].atlas_offset.y=16.f;
+	sprites[0].pos.x= 0.f;
+	sprites[0].pos.y= 0.f;
 	sprites[0].size.w=16.f;
 	sprites[0].size.h=16.f;
+	sprites[0].atlas_offset.x=0.f;
+	sprites[0].atlas_offset.y=0.f;
 
-	sprites[1].pos.x=0.f;
-	sprites[1].pos.y=0.f;
-	sprites[1].atlas_offset.x=16.f;
-	sprites[1].atlas_offset.y=16.f;
-	sprites[1].size.w=5.f;
-	sprites[1].size.h=5.f;
+	sprites[1].pos.x=16.f;
+	sprites[1].pos.y=16.f;
+	sprites[1].size.w=16.f;
+	sprites[1].size.h=16.f;
+	sprites[1].atlas_offset.x=0;
+	sprites[1].atlas_offset.y=16;
+
+	sprites[2].pos.x=0.f;
+	sprites[2].pos.y=0.f;
+	sprites[2].size.w=16.f;
+	sprites[2].size.h=16.f;
+	sprites[2].atlas_offset.x=16;
+	sprites[2].atlas_offset.y=0;
 
 	write_storage_buffer(sprite_shader_sprite_sbo, sprites, sizeof(sprites));
 	draw_triangles(12);

@@ -20,27 +20,25 @@ void main()
 	int vertex_index = gl_VertexID % 4;
 	int sprite_index = gl_VertexID / 4;
 
-	Sprite s = sprites[1];
-
-	float tx = s.pos.x;
-	float ty = s.pos.y;
-	float tw = s.size.x;
-	float th = s.size.x;
+	Sprite s = sprites[2];
 
 	vec2 uvs[4] = 
     {
-		vec2(tx, ty),
-		vec2(tx + tw, ty),
-		vec2(tx, ty + th),
-		vec2(tx + tw, ty + th),
+		vec2(s.atlas_offset.x, s.atlas_offset.y),
+		vec2(s.atlas_offset.x + s.size.x, s.atlas_offset.y),
+		vec2(s.atlas_offset.x, s.atlas_offset.y + s.size.y),
+		vec2(s.atlas_offset.x + s.size.x, s.atlas_offset.y + s.size.y),
     };
+
+	float ndc_w = 2.0 / 800;
+	float ndc_h = 2.0 / 800;
 
 	vec2 vertices[4] = 
 	{
-		vec2(-0.8, +0.8), // TL
-		vec2(+0.8, +0.8), // TR
-		vec2(-0.8, -0.8), // BL
-		vec2(+0.8, -0.8), // BR
+		vec2(-1.0 + (s.pos.x * ndc_w), 1.0 - (s.pos.y * ndc_h)), // TL
+		vec2(-1.0 + ((s.pos.x + s.size.x) * ndc_w), 1.0 - (s.pos.y * ndc_h)), // TR
+		vec2(-1.0 + (s.pos.x * ndc_w), 1.0 - ((s.pos.y + s.size.y) * ndc_h)), // BL
+		vec2(-1.0 + ((s.pos.x + s.size.x) * ndc_w), 1.0 - ((s.pos.y + s.size.y) * ndc_h)), // BR
 	};
 
 	_uv = uvs[vertex_index];
