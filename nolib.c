@@ -521,7 +521,6 @@ void set_viewport(u32 x, u32 y, u32 w, u32 h)
 	glViewport(x, y, w, h);
 }
 
-
 inline u64 get_tick_count()
 {
 	LARGE_INTEGER li;
@@ -583,7 +582,7 @@ u8 load_if_updated(const char* path, void* buffer, u32 buffer_size, u32* time_ch
 #define WINDOW_TITLE "hehe"
 #define WINDOW_CLASS_NAME "hehe"
 #define WINDOW_DEFAULT_WIDTH 800
-#define WINDOW_DEFAULT_HEIGHT 800
+#define WINDOW_DEFAULT_HEIGHT (f32)WINDOW_DEFAULT_WIDTH * (3.f / 4.f)
 
 #define DUMMY_WINDOW_TITLE "_dummy"
 #define DUMMY_WINDOW_CLASS_NAME "_dummy"
@@ -879,21 +878,21 @@ void render()
 {
 	clear_background();
 
-	sprites[0].pos.x = 10.f;
-	sprites[0].pos.y = 10.f;
-	sprites[0].size.w = 16.f;
-	sprites[0].size.h = 16.f;
-	sprites[0].atlas_offset.x = 0.f;
-	sprites[0].atlas_offset.y = 0.f;
-	sprites[0].scale = 15.f;
+	sprites[0].pos.x = 0.f;
+	sprites[0].pos.y = 0.f;
+	sprites[0].size.w = 240.f;
+	sprites[0].size.h = 240 * 0.75f;
+	sprites[0].atlas_offset.x = 0;
+	sprites[0].atlas_offset.y = 0;
+	sprites[0].scale = 800.f / 240.f;
 
-	sprites[1].pos.x = 216.f;
-	sprites[1].pos.y = 216.f;
+	/*sprites[1].pos.x = 250.f;
+	sprites[1].pos.y = 50.f;
 	sprites[1].size.w = 16.f;
 	sprites[1].size.h = 16.f;
-	sprites[1].atlas_offset.x = 0;
-	sprites[1].atlas_offset.y = 16;
-	sprites[1].scale = 10.f;
+	sprites[1].atlas_offset.x = 0.f;
+	sprites[1].atlas_offset.y = 0.f;
+	sprites[1].scale = 25.f;
 
 	sprites[2].pos.x = 50.f;
 	sprites[2].pos.y = 400.f;
@@ -901,7 +900,7 @@ void render()
 	sprites[2].size.h = 16.f;
 	sprites[2].atlas_offset.x = 16;
 	sprites[2].atlas_offset.y = 0;
-	sprites[2].scale = 15.f;
+	sprites[2].scale = 15.f;*/
 
 	write_storage_buffer(sprite_shader_sprite_sbo, sprites, sizeof(sprites));
 	draw_triangles(18);

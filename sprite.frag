@@ -11,7 +11,7 @@ out vec4 color;
 void main()														
 {			
 
-  vec4 textureColor = texelFetch(image, ivec2(_uv), 0);
+	vec4 textureColor = texelFetch(image, ivec2(_uv), 0);
 
 	if(textureColor.a == 0.0)
 	{

@@ -32,7 +32,7 @@ void main()
     };
 
 	float ndc_w = 2.0 / 800;
-	float ndc_h = 2.0 / 800;
+	float ndc_h = 2.0 / 600;
 
 	float px0 = -1.0 + (s.pos.x * ndc_w);
 	float py0 = +1.0 - (s.pos.y * ndc_h);
@@ -49,7 +49,11 @@ void main()
 
 	_uv = uvs[vertex_index];
 	
-	_color = vec4(1,1,1,1);
+	_color = vec4(
+		1,
+		1,
+		1,
+		1);
 
 	gl_Position = vec4(vertices[vertex_index], 0, 1);
 };
