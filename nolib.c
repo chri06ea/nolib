@@ -358,31 +358,6 @@ u32 create_shader_program_from_source(const char* vertex_shader_source, const ch
 	return create_shader_program(vertex_shader, fragment_shader, attributes);
 }
 
-#define TEXTURE_WALL 1
-#define TEXTURE_SPRITE_ATLAS 1
-
-u8 load_texture(u32 texture_id, const void** data, u32* width, u32* height, u32* num_channels)
-{
-	const char* path = 0;
-
-	if(texture_id == TEXTURE_WALL)
-		path = "./wall.jpg";
-
-	if(texture_id == TEXTURE_SPRITE_ATLAS)
-		path = "./atlas.png";
-
-	dcheck(path);
-
-	const void* result = stbi_load(path, width, height, num_channels, 0);
-
-	if(!result)
-		return false;
-
-	*data = result;
-
-	return true;
-}
-
 u32 create_texture_from_memory(const void* data, u32 width, u32 height, u32 num_channels)
 {
 	u32 texture;
@@ -398,21 +373,6 @@ u32 create_texture_from_memory(const void* data, u32 width, u32 height, u32 num_
 	gl_dcheck(glGenerateMipmap(GL_TEXTURE_2D));
 	return texture;
 }
-
-//u32 create_texture(u32 texture_id)
-//{
-//	u32 texture;
-//
-//	void* data;
-//	u32 width, height, num_channels;
-//	dcheck(load_texture(texture_id, &data, &width, &height, &num_channels));
-//
-//	texture = create_texture_from_memory(data, width, height, num_channels);
-//
-//	stbi_image_free(data);
-//
-//	return texture;
-//}
 
 u32 create_vertex_buffer(size_t size, u8 readonly, const void* initial_data)
 {
@@ -578,6 +538,10 @@ u8 load_if_updated(const char* path, void* buffer, u32 buffer_size, u32* time_ch
 	return false;
 }
 
+// Load a single image using stb_image
+unsigned char* load_image(const char* filePath, int* width, int* height, int* components) {
+	return stbi_load(filePath, width, height, components, STBI_default);
+}
 
 #define WINDOW_TITLE "hehe"
 #define WINDOW_CLASS_NAME "hehe"
@@ -684,6 +648,58 @@ Sprite sprites[0x1000];
 u32 num_sprites = 0;
 
 HMODULE module_handle;
+
+typedef struct {
+	int x, y, width, height;
+} SpriteInfo;
+
+
+
+// Generate the sprite atlas by combining multiple sprite images into a single image
+unsigned char* generate_sprite_atlas(const char** filePaths, int numFiles, int* atlasWidth, int* atlasHeight, SpriteInfo* spriteInfos) {
+	// Determine the size of the atlas by computing the maximum width and height of all sprites
+	int maxWidth = 0, maxHeight = 0;
+	for(int i = 0; i < numFiles; i++) {
+		int width, height, components;
+		unsigned char* data = load_image(filePaths[i], &width, &height, &components);
+		maxWidth = width > maxWidth ? width : maxWidth;
+		maxHeight = height > maxHeight ? height : maxHeight;
+		stbi_image_free(data);
+	}
+
+	// Compute the size of the atlas as the next power of 2 that fits all sprites
+	int atlasSize = 1;
+	while(atlasSize < maxWidth || atlasSize < maxHeight) {
+		atlasSize *= 2;
+	}
+	*atlasWidth = *atlasHeight = atlasSize;
+
+	// Allocate memory for the sprite atlas
+	unsigned char* atlasData = (unsigned char*) malloc(atlasSize * atlasSize * 4);
+	memset(atlasData, 0, atlasSize * atlasSize * 4);
+
+	// Copy each sprite into the atlas
+	int x = 0, y = 0;
+	for(int i = 0; i < numFiles; i++) {
+		int width, height, components;
+		unsigned char* data = load_image(filePaths[i], &width, &height, &components);
+		spriteInfos[i].x = x;
+		spriteInfos[i].y = y;
+		spriteInfos[i].width = width;
+		spriteInfos[i].height = height;
+		for(int j = 0; j < height; j++) {
+			memcpy(atlasData + ((y + j) * atlasSize + x) * 4, data + j * width * 4, width * 4);
+		}
+		x += width;
+		if(x + maxWidth > atlasSize) {
+			x = 0;
+			y += maxHeight;
+		}
+		stbi_image_free(data);
+	}
+
+	return atlasData;
+}
 
 void init_window()
 {
@@ -886,14 +902,15 @@ void render()
 	sprites[0].atlas_offset.y = 0;
 	sprites[0].scale = 800.f / 240.f;
 
-	/*sprites[1].pos.x = 250.f;
-	sprites[1].pos.y = 50.f;
+	sprites[1].pos.x = 32.f;
+	sprites[1].pos.y = 32.f;
 	sprites[1].size.w = 16.f;
 	sprites[1].size.h = 16.f;
 	sprites[1].atlas_offset.x = 0.f;
-	sprites[1].atlas_offset.y = 0.f;
-	sprites[1].scale = 25.f;
+	sprites[1].atlas_offset.y = 190.f;
+	sprites[1].scale = 2.f;
 
+	/*
 	sprites[2].pos.x = 50.f;
 	sprites[2].pos.y = 400.f;
 	sprites[2].size.w = 16.f;
@@ -986,6 +1003,15 @@ int main(int argc, const char** argv)
 
 	dcheck(load_if_updated("./atlas.png", atlas_texture_buffer, sizeof(atlas_texture_buffer),
 		&atlas_texture_update_time, &atlas_texture_size));
+
+	const const char* filepaths[] = {
+		"atlas.png", "test.png"
+	};
+
+	int aw, ah;
+	SpriteInfo sprs[100];
+
+	generate_sprite_atlas(filepaths, 2, &aw, &ah, sprs);
 
 	init_gl();
 
