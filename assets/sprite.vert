@@ -9,12 +9,15 @@ struct Sprite
 	vec2 size;
 	vec2 atlas_offset;
 	double scale;
+	bool full_screen;
 };
 
 layout(std430, binding = 0) buffer VertexData
 {
     Sprite sprites[];
 };
+
+#define H 2
 
 void main()														
 {		
@@ -30,26 +33,41 @@ void main()
 		vec2(s.atlas_offset.x, s.atlas_offset.y + s.size.y),
 		vec2(s.atlas_offset.x + s.size.x, s.atlas_offset.y + s.size.y),
     };
-	
-	float ndc_w = 2.0 / 800;
-	float ndc_h = 2.0 / 600;
-	
-	float px0 = -1.0 + (s.pos.x * ndc_w);
-	float py0 = +1.0 - (s.pos.y * ndc_h);
-	float px1 = -1.0 + ((s.pos.x + s.size.x * float(s.scale)) * ndc_w);
-	float py1 = +1.0 - ((s.pos.y + s.size.y * float(s.scale)) * ndc_h);
-	
-	vec2 vertices[4] = 
-	{
-		vec2(px0, py0), // TL
-		vec2(px1, py0), // TR
-		vec2(px0, py1), // BL
-		vec2(px1, py1), // BR
-	};
-	
+		
 	_uv = uvs[vertex_index];
 	
 	_color = vec4(1, 1, 1, 1);
 	
-	gl_Position = vec4(vertices[vertex_index], 0, 1);
+	if(s.full_screen)
+	{
+		vec2 vertices[4] = 
+		{
+			vec2(-1, +1), // TL
+			vec2(+1, +1), // TR
+			vec2(-1, -1), // BL
+			vec2(+1, -1), // BR
+		};
+
+		gl_Position = vec4(vertices[vertex_index], 0, 1);
+	}
+	else
+	{
+		float ndc_w = 2.0 / 800;
+		float ndc_h = 2.0 / 600;
+	
+		float px0 = -1.0 + (s.pos.x * ndc_w);
+		float py0 = +1.0 - (s.pos.y * ndc_h);
+		float px1 = -1.0 + ((s.pos.x + s.size.x * float(s.scale)) * ndc_w);
+		float py1 = +1.0 - ((s.pos.y + s.size.y * float(s.scale)) * ndc_h);
+	
+		vec2 vertices[4] = 
+		{
+			vec2(px0, py0), // TL
+			vec2(px1, py0), // TR
+			vec2(px0, py1), // BL
+			vec2(px1, py1), // BR
+		};
+
+		gl_Position = vec4(vertices[vertex_index], 0, 1);
+	}
 };

@@ -634,6 +634,113 @@ void openlgl_setup_vertex_attributes(u32 shader, const ShaderAttribute attribute
 #pragma endregion
 
 //////////////////////////////////////////////////////////////////////
+// Window
+
+HWND g_window_handle;
+HDC g_device_context;
+HGLRC g_rendering_context;
+u32 window_width = DEFAULT_WINDOW_WIDTH, window_height = DEFAULT_WINDOW_HEIGHT;
+
+LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+	LRESULT result = 0;
+
+	switch(msg)
+	{
+		case WM_SIZE:
+		{
+			RECT client_rect;
+			fail_if_false(GetClientRect(window, &client_rect));
+			window_width = (client_rect.right - client_rect.left);
+			window_height = (client_rect.bottom - client_rect.top);
+			if(glViewport)
+			{
+				glViewport(0, 0, window_width, window_height);
+			}
+			break;
+		}
+		default:
+			return DefWindowProcA(window, msg, wparam, lparam);
+	}
+
+	return result;
+}
+
+void window_init()
+{
+	i32 window_pixel_format;
+	UINT num_window_pixel_formats;
+	PIXELFORMATDESCRIPTOR pixel_format_desc;
+	HMODULE module_handle;
+
+
+	const char* window_class_name = "Hello";
+	const char* window_title = "Hello";
+
+	fail_if_false(module_handle = GetModuleHandle(NULL));
+
+	WNDCLASSEXA window_class = {
+		.cbSize = sizeof(WNDCLASSEXA),
+		.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
+		.lpfnWndProc = window_proc,
+		.hInstance = module_handle,
+		.hCursor = LoadCursor(0, IDC_ARROW),
+		.lpszClassName = window_title
+	};
+
+	i32 pixel_format_attributes[] = {
+		WGL_DRAW_TO_WINDOW_ARB, 1,
+		WGL_SUPPORT_OPENGL_ARB, 1,
+		WGL_DOUBLE_BUFFER_ARB, 1,
+		WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
+		WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+		WGL_COLOR_BITS_ARB, 32,
+		WGL_DEPTH_BITS_ARB, 24,
+		WGL_STENCIL_BITS_ARB, 8,
+		0
+	};
+
+	i32 gl_attributes[] = {
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+		0,
+	};
+
+	fail_if_false(RegisterClassExA(&window_class));
+
+	fail_if_false(g_window_handle = CreateWindowExA(0, window_class_name, window_title,
+		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+		DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0, 0, module_handle, 0));
+
+	fail_if_false(g_device_context = GetDC(g_window_handle));
+
+	fail_if_false(wglChoosePixelFormatARB(g_device_context, pixel_format_attributes, 0, 1, &window_pixel_format, &num_window_pixel_formats));
+
+	fail_if_false(DescribePixelFormat(g_device_context, window_pixel_format, sizeof(pixel_format_desc), &pixel_format_desc));
+
+	fail_if_false(SetPixelFormat(g_device_context, window_pixel_format, &pixel_format_desc));
+
+	fail_if_false(g_rendering_context = wglCreateContextAttribsARB(g_device_context, 0, gl_attributes));
+	fail_if_false(wglMakeCurrent(g_device_context, g_rendering_context));
+
+	fail_if_false(wglSwapIntervalEXT(false));
+
+	ShowWindow(g_window_handle, SW_NORMAL);
+}
+
+void window_process_messages()
+{
+	MSG window_message;
+
+	while(PeekMessage(&window_message, g_window_handle, 0, 0, PM_REMOVE) > 0)
+	{
+		TranslateMessage(&window_message);
+		DispatchMessage(&window_message);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////
 // Sprite renderer
 
 typedef struct {
@@ -647,6 +754,7 @@ typedef struct {
 	f32 sprite_width, sprite_height;
 	f32 atlas_x, atlas_y;
 	double scale;
+	u8 full_screen;
 } AtlasSpriteRenderData;
 
 Resource g_sprite_render_atlas_vertex_shader_resource;
@@ -844,20 +952,19 @@ const AtlasSpriteInfo* sprite_renderer_get_sprite_info_by_name(const ch8* sprite
 	return null;
 }
 
-void sprite_renderer_push_sprite(const char* sprite_name, int x, int y)
+void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen)
 {
-	f32 scale = 1.f;
-
-	AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
+	const AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
 
 	AtlasSpriteRenderData* sprite = &sprites[sprite_count++];
 	sprite->atlas_x = (f32) sprite_info->atlas_x;
 	sprite->atlas_y = (f32) sprite_info->atlas_y;
 	sprite->sprite_width = (f32) sprite_info->sprite_width;
 	sprite->sprite_height = (f32) sprite_info->sprite_height;
-	sprite->screen_x = x;
-	sprite->screen_y = y;
+	sprite->screen_x = (f32) x;
+	sprite->screen_y = (f32) y;
 	sprite->scale = scale;
+	sprite->full_screen = full_screen;
 }
 
 void sprite_renderer_render()
@@ -867,121 +974,14 @@ void sprite_renderer_render()
 
 	gl_fail_if_false(sprites = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY));
 
-	sprite_renderer_push_sprite("room.png",0,0);
-	sprite_renderer_push_sprite("test.png",300,300);
+	sprite_renderer_push_sprite("room.png", 0, 0, 1, true);
+	sprite_renderer_push_sprite("test.png",300,300, 3, false);
 
 	gl_fail_if_false(glUnmapBuffer(GL_SHADER_STORAGE_BUFFER));
 
 	gl_fail_if_false(glDrawElements(GL_TRIANGLES, sprite_count * 6, GL_UNSIGNED_INT, 0));
 
 	sprite_count = 0;
-}
-
-//////////////////////////////////////////////////////////////////////
-// Window
-
-HWND g_window_handle;
-HDC g_device_context;
-HGLRC g_rendering_context;
-u32 window_width = DEFAULT_WINDOW_WIDTH, window_height = DEFAULT_WINDOW_HEIGHT;
-
-LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
-{
-	LRESULT result = 0;
-
-	switch(msg)
-	{
-		case WM_SIZE:
-		{
-			RECT client_rect;
-			fail_if_false(GetClientRect(window, &client_rect));
-			window_width = (client_rect.right - client_rect.left);
-			window_height = (client_rect.bottom - client_rect.top);
-			if(glViewport)
-			{
-				glViewport(0, 0, window_width, window_height);
-			}
-			break;
-		}
-		default:
-			return DefWindowProcA(window, msg, wparam, lparam);
-	}
-
-	return result;
-}
-
-void window_init()
-{
-	i32 window_pixel_format;
-	UINT num_window_pixel_formats;
-	PIXELFORMATDESCRIPTOR pixel_format_desc;
-	HMODULE module_handle;
-
-
-	const char* window_class_name = "Hello";
-	const char* window_title = "Hello";
-
-	fail_if_false(module_handle = GetModuleHandle(NULL));
-
-	WNDCLASSEXA window_class = {
-		.cbSize = sizeof(WNDCLASSEXA),
-		.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-		.lpfnWndProc = window_proc,
-		.hInstance = module_handle,
-		.hCursor = LoadCursor(0, IDC_ARROW),
-		.lpszClassName = window_title
-	};
-
-	i32 pixel_format_attributes[] = {
-		WGL_DRAW_TO_WINDOW_ARB, 1,
-		WGL_SUPPORT_OPENGL_ARB, 1,
-		WGL_DOUBLE_BUFFER_ARB, 1,
-		WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
-		WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
-		WGL_COLOR_BITS_ARB, 32,
-		WGL_DEPTH_BITS_ARB, 24,
-		WGL_STENCIL_BITS_ARB, 8,
-		0
-	};
-
-	i32 gl_attributes[] = {
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
-		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-		0,
-	};
-
-	fail_if_false(RegisterClassExA(&window_class));
-
-	fail_if_false(g_window_handle = CreateWindowExA(0, window_class_name, window_title,
-		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-		DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0, 0, module_handle, 0));
-
-	fail_if_false(g_device_context = GetDC(g_window_handle));
-
-	fail_if_false(wglChoosePixelFormatARB(g_device_context, pixel_format_attributes, 0, 1, &window_pixel_format, &num_window_pixel_formats));
-
-	fail_if_false(DescribePixelFormat(g_device_context, window_pixel_format, sizeof(pixel_format_desc), &pixel_format_desc));
-
-	fail_if_false(SetPixelFormat(g_device_context, window_pixel_format, &pixel_format_desc));
-
-	fail_if_false(g_rendering_context = wglCreateContextAttribsARB(g_device_context, 0, gl_attributes));
-	fail_if_false(wglMakeCurrent(g_device_context, g_rendering_context));
-
-	fail_if_false(wglSwapIntervalEXT(false));
-
-	ShowWindow(g_window_handle, SW_NORMAL);
-}
-
-void window_process_messages()
-{
-	MSG window_message;
-
-	while(PeekMessage(&window_message, g_window_handle, 0, 0, PM_REMOVE) > 0)
-	{
-		TranslateMessage(&window_message);
-		DispatchMessage(&window_message);
-	}
 }
 
 
