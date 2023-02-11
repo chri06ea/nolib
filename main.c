@@ -251,7 +251,7 @@ bool update_resource(Resource* resource)
 	return create_or_update_resource_from_path(resource);
 }
 
-void load_resources_in_folder(const char* path, Resource* resources, u32* resource_count, u32 resources_max_count)
+void init_resources_from_folder(const char* path, Resource* resources, u32* resource_count, u32 resources_max_count)
 {
 	char find_fild_path[MAX_PATH];
 	sprintf_s(find_fild_path, sizeof(find_fild_path), "%s/*", path);
@@ -749,29 +749,12 @@ void sprite_renderer_init_atlas_texture()
 {
 	// ChatGPT
 
-	u32 max_width = 0, max_height = 0;
-
-	// Determine the size of the atlas by computing the maximum width and height of all sprites
-	for(size_t i = 0; i < g_sprite_renderer_texture_resources_count; i++)
-	{
-		u32 sprite_width, height, comp;
-		void* data = stbi_load(g_sprite_renderer_texture_resources[i].path, &sprite_width, &height, &comp, STBI_default);
-		fail_if_false(data);
-
-		max_width = sprite_width > max_width ? sprite_width : max_width;
-		max_height = height > max_height ? height : max_height;
-		stbi_image_free(data);
-	}
-
-	// Compute the size of the atlas as the next power of 2 that fits all sprites
-	u32 atlas_size = 1;
-	while(atlas_size < max_width || atlas_size < max_height) {
-		atlas_size *= 2;
-	}
+	u32 atlas_width = 1000, atlas_height = 1000;
+	u32 atlas_size = atlas_width * atlas_height;
 
 	// Allocate memory for the sprite atlas
-	u8* atlas_data = (unsigned char*) malloc((atlas_size * atlas_size) * 4);
-	memset(atlas_data, 0, atlas_size * atlas_size * 4);
+	u8* atlas_data = (u8*) malloc(atlas_size * 4);
+	memset(atlas_data, 0, atlas_size * 4);
 
 	// Copy each sprite into the atlas
 	int x = 0, y = 0;
@@ -785,7 +768,8 @@ void sprite_renderer_init_atlas_texture()
 
 		for(int row = 0; row < sprite_height; row++)
 		{
-			u32 atlas_row_offset = row * max_width;
+			u32 atlas_row_offset = row * atlas_width;
+			//atlas_row_offset += (y*atlas_width)
 			u32 sprite_row_offset = row * sprite_width;
 
 			memcpy(
@@ -796,9 +780,9 @@ void sprite_renderer_init_atlas_texture()
 
 
 		x += sprite_width;
-		if(x + max_width > atlas_size) {
+		if(x + atlas_width > atlas_size) {
 			x = 0;
-			y += max_height;
+			y += atlas_height;
 		}
 		stbi_image_free(sprite_data);
 	}
@@ -812,7 +796,7 @@ void sprite_renderer_init_atlas_texture()
 	gl_fail_if_false(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
 	gl_fail_if_false(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 	// generate the texture (and mipmap)
-	gl_fail_if_false(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, max_width, max_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlas_data));
+	gl_fail_if_false(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas_width, atlas_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlas_data));
 	gl_fail_if_false(glGenerateMipmap(GL_TEXTURE_2D));
 	#endif
 
@@ -848,7 +832,7 @@ void sprite_renderer_render()
 	sprites[0].sprite_height = (f32) g_sprite_renderer_atlas_sprite_info[0].sprite_height;
 	sprites[0].screen_x = 0;
 	sprites[0].screen_y = 0;
-	sprites[0].scale = 3;
+	sprites[0].scale = 0.95;
 	sprite_count++;
 
 	gl_fail_if_false(glUnmapBuffer(GL_SHADER_STORAGE_BUFFER));
@@ -989,14 +973,12 @@ inline u64 get_ticks_per_second()
 //////////////////////////////////////////////////////////////////////
 // Main
 
-
-
 void init_resources()
 {
 	init_resource_from_path("./assets/sprite.vert", &g_sprite_render_atlas_vertex_shader_resource);
 	init_resource_from_path("./assets/sprite.frag", &g_sprite_render_atlas_fragment_shader_resource);
 
-	load_resources_in_folder("./assets/textures", g_sprite_renderer_texture_resources, &g_sprite_renderer_texture_resources_count, g_sprite_renderer_texture_resources_max_count);
+	init_resources_from_folder("./assets/textures", g_sprite_renderer_texture_resources, &g_sprite_renderer_texture_resources_count, g_sprite_renderer_texture_resources_max_count);
 }
 
 void hot_reload()
@@ -1048,6 +1030,7 @@ int main(int argc, const char** argv)
 		window_process_messages();
 
 		sprite_renderer_render();
+
 		SwapBuffers(g_device_context);
 	}
 
