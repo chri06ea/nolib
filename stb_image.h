@@ -408,7 +408,7 @@ extern "C"
 
     typedef struct
     {
-        int (*read)(void *user, char *data, int size); // fill 'data' with 'size' bytes.  return number of bytes actually read
+        int (*read)(void *user, char *data, int sprite_size); // fill 'data' with 'size' bytes.  return number of bytes actually read
         void (*skip)(void *user, int n);               // skip the next 'n' bytes, or 'unget' the last -n bytes if negative
         int (*eof)(void *user);                        // returns nonzero if we are at end of file/data
     } stbi_io_callbacks;
@@ -835,9 +835,9 @@ static void stbi__start_callbacks(stbi__context *s, stbi_io_callbacks *c, void *
 
 #ifndef STBI_NO_STDIO
 
-static int stbi__stdio_read(void *user, char *data, int size)
+static int stbi__stdio_read(void *user, char *data, int sprite_size)
 {
-    return (int)fread(data, 1, size, (FILE *)user);
+    return (int)fread(data, 1, sprite_size, (FILE *)user);
 }
 
 static void stbi__stdio_skip(void *user, int n)
@@ -971,9 +971,9 @@ static int stbi__err(const char *str)
 }
 #endif
 
-static void *stbi__malloc(size_t size)
+static void *stbi__malloc(size_t sprite_size)
 {
-    return STBI_MALLOC(size);
+    return STBI_MALLOC(sprite_size);
 }
 
 // stb_image uses ints pervasively, including for offset calculations.
@@ -1544,12 +1544,12 @@ STBIDEF int stbi_is_hdr(char const *filename)
 STBIDEF int stbi_is_hdr_from_file(FILE *f)
 {
 #ifndef STBI_NO_HDR
-    long pos = ftell(f);
+    long atlas_pos = ftell(f);
     int res;
     stbi__context s;
     stbi__start_file(&s, f);
     res = stbi__hdr_test(&s);
-    fseek(f, pos, SEEK_SET);
+    fseek(f, atlas_pos, SEEK_SET);
     return res;
 #else
     STBI_NOTUSED(f);
@@ -2090,7 +2090,7 @@ typedef struct
     // weirdly, repacking this into AoS is a 10% speed loss, instead of a win
     stbi__uint16 code[256];
     stbi_uc values[256];
-    stbi_uc size[257];
+    stbi_uc sprite_size[257];
     unsigned int maxcode[18];
     int delta[17]; // old 'firstsymbol' - old 'firstcode'
 } stbi__huffman;
@@ -2156,8 +2156,8 @@ static int stbi__build_huffman(stbi__huffman *h, int *count)
     // build size list for each symbol (from JPEG spec)
     for (i = 0; i < 16; ++i)
         for (j = 0; j < count[i]; ++j)
-            h->size[k++] = (stbi_uc)(i + 1);
-    h->size[k] = 0;
+            h->sprite_size[k++] = (stbi_uc)(i + 1);
+    h->sprite_size[k] = 0;
 
     // compute actual symbols (from jpeg spec)
     code = 0;
@@ -2166,9 +2166,9 @@ static int stbi__build_huffman(stbi__huffman *h, int *count)
     {
         // compute delta to add to code to compute symbol id
         h->delta[j] = k - code;
-        if (h->size[k] == j)
+        if (h->sprite_size[k] == j)
         {
-            while (h->size[k] == j)
+            while (h->sprite_size[k] == j)
                 h->code[k++] = (stbi__uint16)(code++);
             if (code - 1 >= (1u << j))
                 return stbi__err("bad code lengths", "Corrupt JPEG");
@@ -2183,7 +2183,7 @@ static int stbi__build_huffman(stbi__huffman *h, int *count)
     memset(h->fast, 255, 1 << FAST_BITS);
     for (i = 0; i < k; ++i)
     {
-        int s = h->size[i];
+        int s = h->sprite_size[i];
         if (s <= FAST_BITS)
         {
             int c = h->code[i] << (FAST_BITS - s);
@@ -2211,7 +2211,7 @@ static void stbi__build_fast_ac(stbi__int16 *fast_ac, stbi__huffman *h)
             int rs = h->values[fast];
             int run = (rs >> 4) & 15;
             int magbits = rs & 15;
-            int len = h->size[fast];
+            int len = h->sprite_size[fast];
 
             if (magbits && len + magbits <= FAST_BITS)
             {
@@ -2268,7 +2268,7 @@ stbi_inline static int stbi__jpeg_huff_decode(stbi__jpeg *j, stbi__huffman *h)
     k = h->fast[c];
     if (k < 255)
     {
-        int s = h->size[k];
+        int s = h->sprite_size[k];
         if (s > j->code_bits)
             return -1;
         j->code_buffer <<= s;
@@ -2298,7 +2298,7 @@ stbi_inline static int stbi__jpeg_huff_decode(stbi__jpeg *j, stbi__huffman *h)
 
     // convert the huffman code to the symbol id
     c = ((j->code_buffer >> (32 - k)) & stbi__bmask[k]) + h->delta[k];
-    STBI_ASSERT((((j->code_buffer) >> (32 - h->size[c])) & stbi__bmask[h->size[c]]) == h->code[c]);
+    STBI_ASSERT((((j->code_buffer) >> (32 - h->sprite_size[c])) & stbi__bmask[h->sprite_size[c]]) == h->code[c]);
 
     // convert the id to a symbol
     j->code_bits -= k;
@@ -4598,7 +4598,7 @@ typedef struct
     stbi__uint16 firstcode[16];
     int maxcode[17];
     stbi__uint16 firstsymbol[16];
-    stbi_uc size[STBI__ZNSYMS];
+    stbi_uc sprite_size[STBI__ZNSYMS];
     stbi__uint16 value[STBI__ZNSYMS];
 } stbi__zhuffman;
 
@@ -4655,7 +4655,7 @@ static int stbi__zbuild_huffman(stbi__zhuffman *z, const stbi_uc *sizelist, int 
         {
             int c = next_code[s] - z->firstcode[s] + z->firstsymbol[s];
             stbi__uint16 fastv = (stbi__uint16)((s << 9) | i);
-            z->size[c] = (stbi_uc)s;
+            z->sprite_size[c] = (stbi_uc)s;
             z->value[c] = (stbi__uint16)i;
             if (s <= STBI__ZFAST_BITS)
             {
@@ -4742,7 +4742,7 @@ static int stbi__zhuffman_decode_slowpath(stbi__zbuf *a, stbi__zhuffman *z)
     b = (k >> (16 - s)) - z->firstcode[s] + z->firstsymbol[s];
     if (b >= STBI__ZNSYMS)
         return -1; // some data was corrupt somewhere!
-    if (z->size[b] != s)
+    if (z->sprite_size[b] != s)
         return -1; // was originally an assert, but report failure instead.
     a->code_buffer >>= s;
     a->num_bits -= s;
@@ -5260,7 +5260,7 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
 
     int output_bytes = out_n * bytes;
     int filter_bytes = img_n * bytes;
-    int width = x;
+    int sprite_width = x;
 
     STBI_ASSERT(out_n == s->img_n || out_n == s->img_n + 1);
     a->out = (stbi_uc *)stbi__malloc_mad3(x, y, output_bytes, 0); // extra bytes to write off the end into
@@ -5293,7 +5293,7 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
                 return stbi__err("invalid width", "Corrupt PNG");
             cur += x * out_n - img_width_bytes; // store output to the rightmost img_len bytes, so we can decode in place
             filter_bytes = 1;
-            width = img_width_bytes;
+            sprite_width = img_width_bytes;
         }
         prior = cur - stride; // bugfix: need to compute this after 'cur +=' computation above
 
@@ -5359,7 +5359,7 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
         // this is a little gross, so that we don't switch per-pixel or per-component
         if (depth < 8 || img_n == out_n)
         {
-            int nk = (width - 1) * filter_bytes;
+            int nk = (sprite_width - 1) * filter_bytes;
 #define STBI__CASE(f) \
     case f:           \
         for (k = 0; k < nk; ++k)
@@ -6404,7 +6404,7 @@ static void *stbi__bmp_load(stbi__context *s, int *x, int *y, int *comp, int req
     stbi_uc *out;
     unsigned int mr = 0, mg = 0, mb = 0, ma = 0, all_a;
     stbi_uc pal[256][4];
-    int psize = 0, i, j, width;
+    int psize = 0, i, j, sprite_width;
     int flip_vertically, pad, target;
     stbi__bmp_data info;
     STBI_NOTUSED(ri);
@@ -6480,17 +6480,17 @@ static void *stbi__bmp_load(stbi__context *s, int *x, int *y, int *comp, int req
         }
         stbi__skip(s, info.offset - info.extra_read - info.hsz - psize * (info.hsz == 12 ? 3 : 4));
         if (info.bpp == 1)
-            width = (s->img_x + 7) >> 3;
+            sprite_width = (s->img_x + 7) >> 3;
         else if (info.bpp == 4)
-            width = (s->img_x + 1) >> 1;
+            sprite_width = (s->img_x + 1) >> 1;
         else if (info.bpp == 8)
-            width = s->img_x;
+            sprite_width = s->img_x;
         else
         {
             STBI_FREE(out);
             return stbi__errpuc("bad bpp", "Corrupt BMP");
         }
-        pad = (-width) & 3;
+        pad = (-sprite_width) & 3;
         if (info.bpp == 1)
         {
             for (j = 0; j < (int)s->img_y; ++j)
@@ -6552,12 +6552,12 @@ static void *stbi__bmp_load(stbi__context *s, int *x, int *y, int *comp, int req
         int easy = 0;
         stbi__skip(s, info.offset - info.extra_read - info.hsz);
         if (info.bpp == 24)
-            width = 3 * s->img_x;
+            sprite_width = 3 * s->img_x;
         else if (info.bpp == 16)
-            width = 2 * s->img_x;
+            sprite_width = 2 * s->img_x;
         else /* bpp = 32 and pad = 0 */
-            width = 0;
-        pad = (-width) & 3;
+            sprite_width = 0;
+        pad = (-sprite_width) & 3;
         if (info.bpp == 24)
         {
             easy = 1;
@@ -7399,7 +7399,7 @@ static int stbi__pic_test_core(stbi__context *s)
 
 typedef struct
 {
-    stbi_uc size, type, channel;
+    stbi_uc sprite_size, type, channel;
 } stbi__pic_packet;
 
 static stbi_uc *stbi__readval(stbi__context *s, int channel, stbi_uc *dest)
@@ -7428,7 +7428,7 @@ static void stbi__copyval(int channel, stbi_uc *dest, const stbi_uc *src)
             dest[i] = src[i];
 }
 
-static stbi_uc *stbi__pic_load_core(stbi__context *s, int width, int height, int *comp, stbi_uc *result)
+static stbi_uc *stbi__pic_load_core(stbi__context *s, int sprite_width, int height, int *comp, stbi_uc *result)
 {
     int act_comp = 0, num_packets = 0, y, chained;
     stbi__pic_packet packets[10];
@@ -7445,7 +7445,7 @@ static stbi_uc *stbi__pic_load_core(stbi__context *s, int width, int height, int
         packet = &packets[num_packets++];
 
         chained = stbi__get8(s);
-        packet->size = stbi__get8(s);
+        packet->sprite_size = stbi__get8(s);
         packet->type = stbi__get8(s);
         packet->channel = stbi__get8(s);
 
@@ -7453,7 +7453,7 @@ static stbi_uc *stbi__pic_load_core(stbi__context *s, int width, int height, int
 
         if (stbi__at_eof(s))
             return stbi__errpuc("bad file", "file too short (reading packets)");
-        if (packet->size != 8)
+        if (packet->sprite_size != 8)
             return stbi__errpuc("bad format", "packet isn't 8bpp");
     } while (chained);
 
@@ -7466,7 +7466,7 @@ static stbi_uc *stbi__pic_load_core(stbi__context *s, int width, int height, int
         for (packet_idx = 0; packet_idx < num_packets; ++packet_idx)
         {
             stbi__pic_packet *packet = &packets[packet_idx];
-            stbi_uc *dest = result + y * width * 4;
+            stbi_uc *dest = result + y * sprite_width * 4;
 
             switch (packet->type)
             {
@@ -7477,7 +7477,7 @@ static stbi_uc *stbi__pic_load_core(stbi__context *s, int width, int height, int
             { // uncompressed
                 int x;
 
-                for (x = 0; x < width; ++x, dest += 4)
+                for (x = 0; x < sprite_width; ++x, dest += 4)
                     if (!stbi__readval(s, packet->channel, dest))
                         return 0;
                 break;
@@ -7485,7 +7485,7 @@ static stbi_uc *stbi__pic_load_core(stbi__context *s, int width, int height, int
 
             case 1: // Pure RLE
             {
-                int left = width, i;
+                int left = sprite_width, i;
 
                 while (left > 0)
                 {
@@ -7510,7 +7510,7 @@ static stbi_uc *stbi__pic_load_core(stbi__context *s, int width, int height, int
 
             case 2:
             { // Mixed RLE
-                int left = width;
+                int left = sprite_width;
                 while (left > 0)
                 {
                     int count = stbi__get8(s), i;
@@ -8335,7 +8335,7 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
     char buffer[STBI__HDR_BUFLEN];
     char *token;
     int valid = 0;
-    int width, height;
+    int sprite_width, height;
     stbi_uc *scanline;
     float *hdr_data;
     int len;
@@ -8374,14 +8374,14 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
     if (strncmp(token, "+X ", 3))
         return stbi__errpf("unsupported data layout", "Unsupported HDR format");
     token += 3;
-    width = (int)strtol(token, NULL, 10);
+    sprite_width = (int)strtol(token, NULL, 10);
 
     if (height > STBI_MAX_DIMENSIONS)
         return stbi__errpf("too large", "Very large image (corrupt?)");
-    if (width > STBI_MAX_DIMENSIONS)
+    if (sprite_width > STBI_MAX_DIMENSIONS)
         return stbi__errpf("too large", "Very large image (corrupt?)");
 
-    *x = width;
+    *x = sprite_width;
     *y = height;
 
     if (comp)
@@ -8389,27 +8389,27 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
     if (req_comp == 0)
         req_comp = 3;
 
-    if (!stbi__mad4sizes_valid(width, height, req_comp, sizeof(float), 0))
+    if (!stbi__mad4sizes_valid(sprite_width, height, req_comp, sizeof(float), 0))
         return stbi__errpf("too large", "HDR image is too large");
 
     // Read data
-    hdr_data = (float *)stbi__malloc_mad4(width, height, req_comp, sizeof(float), 0);
+    hdr_data = (float *)stbi__malloc_mad4(sprite_width, height, req_comp, sizeof(float), 0);
     if (!hdr_data)
         return stbi__errpf("outofmem", "Out of memory");
 
     // Load image data
     // image data is stored as some number of sca
-    if (width < 8 || width >= 32768)
+    if (sprite_width < 8 || sprite_width >= 32768)
     {
         // Read flat data
         for (j = 0; j < height; ++j)
         {
-            for (i = 0; i < width; ++i)
+            for (i = 0; i < sprite_width; ++i)
             {
                 stbi_uc rgbe[4];
             main_decode_loop:
                 stbi__getn(s, rgbe, 4);
-                stbi__hdr_convert(hdr_data + j * width * req_comp + i * req_comp, rgbe, req_comp);
+                stbi__hdr_convert(hdr_data + j * sprite_width * req_comp + i * req_comp, rgbe, req_comp);
             }
         }
     }
@@ -8440,7 +8440,7 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
             }
             len <<= 8;
             len |= stbi__get8(s);
-            if (len != width)
+            if (len != sprite_width)
             {
                 STBI_FREE(hdr_data);
                 STBI_FREE(scanline);
@@ -8448,7 +8448,7 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
             }
             if (scanline == NULL)
             {
-                scanline = (stbi_uc *)stbi__malloc_mad2(width, 4, 0);
+                scanline = (stbi_uc *)stbi__malloc_mad2(sprite_width, 4, 0);
                 if (!scanline)
                 {
                     STBI_FREE(hdr_data);
@@ -8460,7 +8460,7 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
             {
                 int nleft;
                 i = 0;
-                while ((nleft = width - i) > 0)
+                while ((nleft = sprite_width - i) > 0)
                 {
                     count = stbi__get8(s);
                     if (count > 128)
@@ -8491,8 +8491,8 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
                     }
                 }
             }
-            for (i = 0; i < width; ++i)
-                stbi__hdr_convert(hdr_data + (j * width + i) * req_comp, scanline + i * 4, req_comp);
+            for (i = 0; i < sprite_width; ++i)
+                stbi__hdr_convert(hdr_data + (j * sprite_width + i) * req_comp, scanline + i * 4, req_comp);
         }
         if (scanline)
             STBI_FREE(scanline);
@@ -8706,7 +8706,7 @@ static int stbi__pic_info(stbi__context *s, int *x, int *y, int *comp)
 
         packet = &packets[num_packets++];
         chained = stbi__get8(s);
-        packet->size = stbi__get8(s);
+        packet->sprite_size = stbi__get8(s);
         packet->type = stbi__get8(s);
         packet->channel = stbi__get8(s);
         act_comp |= packet->channel;
@@ -8716,7 +8716,7 @@ static int stbi__pic_info(stbi__context *s, int *x, int *y, int *comp)
             stbi__rewind(s);
             return 0;
         }
-        if (packet->size != 8)
+        if (packet->sprite_size != 8)
         {
             stbi__rewind(s);
             return 0;
@@ -8965,10 +8965,10 @@ STBIDEF int stbi_info_from_file(FILE *f, int *x, int *y, int *comp)
 {
     int r;
     stbi__context s;
-    long pos = ftell(f);
+    long atlas_pos = ftell(f);
     stbi__start_file(&s, f);
     r = stbi__info_main(&s, x, y, comp);
-    fseek(f, pos, SEEK_SET);
+    fseek(f, atlas_pos, SEEK_SET);
     return r;
 }
 
@@ -8987,10 +8987,10 @@ STBIDEF int stbi_is_16_bit_from_file(FILE *f)
 {
     int r;
     stbi__context s;
-    long pos = ftell(f);
+    long atlas_pos = ftell(f);
     stbi__start_file(&s, f);
     r = stbi__is_16_main(&s);
-    fseek(f, pos, SEEK_SET);
+    fseek(f, atlas_pos, SEEK_SET);
     return r;
 }
 #endif // !STBI_NO_STDIO

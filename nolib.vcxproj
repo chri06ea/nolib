@@ -140,19 +140,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include=".gitignore" />
+    <None Include="assets\sprite.frag" />
+    <None Include="assets\sprite.vert" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include=".gitignore" />
-    <None Include="sprite.vert" />
-    <None Include="sprite.frag" />
+    <ClCompile Include="main.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="nolib.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="atlas.png" />
-    <Image Include="wall.jpg" />
+    <Image Include="assets\textures\atlas.png" />
+    <Image Include="assets\textures\test.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
