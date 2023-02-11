@@ -21,7 +21,7 @@
 //////////////////////////////////////////////////////////////////////
 // Core types
 
-#define nil void
+#define null 0
 #define ch8 char
 #define ch16 wchar_t
 #define u8 unsigned __int8
@@ -458,41 +458,41 @@ typedef struct {
 #define GL_WRITE_ONLY 0x88B9
 #define GL_READ_WRITE 0x88BA
 
-nil(__stdcall* glBindBuffer)(u32 target, u32 buffer);
-nil(__stdcall* glGenBuffers)(i32 count, u32* buffers);
-nil(__stdcall* glBufferData)(u32 target, size_t sprite_size, const void* data, u32 usage);
-nil(__stdcall* glBindBufferBase)(u32 target, u32 index, u32 buffer);
-nil(__stdcall* glBufferSubData)(u32 target, intptr offset, uintptr sprite_size, const void* data);
-nil(__stdcall* glGetShaderiv)(u32 program, u32 pname, int* params);
+void(__stdcall* glBindBuffer)(u32 target, u32 buffer);
+void(__stdcall* glGenBuffers)(i32 count, u32* buffers);
+void(__stdcall* glBufferData)(u32 target, size_t sprite_size, const void* data, u32 usage);
+void(__stdcall* glBindBufferBase)(u32 target, u32 index, u32 buffer);
+void(__stdcall* glBufferSubData)(u32 target, intptr offset, uintptr sprite_size, const void* data);
+void(__stdcall* glGetShaderiv)(u32 program, u32 pname, int* params);
 u32(__stdcall* glCreateShader)(u32 type);
-nil(__stdcall* glShaderSource)(u32 _shader, i32 count, const char* const* string, const int* length);
-nil(__stdcall* glCompileShader)(u32 _shader);
+void(__stdcall* glShaderSource)(u32 _shader, i32 count, const char* const* string, const int* length);
+void(__stdcall* glCompileShader)(u32 _shader);
 u32(__stdcall* glCreateProgram)(void);
-nil(__stdcall* glAttachShader)(u32 program, u32 _shader);
-nil(__stdcall* glLinkProgram)(u32 program);
-nil(__stdcall* glGetProgramiv)(u32 program, u32 pname, int* params);
-nil(__stdcall* glGetProgramInfoLog)(u32 program, i32 bufSize, i32* length, char* infoLog);
-nil(__stdcall* glGetShaderInfoLog)(u32 _shader, i32 bufSize, i32* length, char* infoLog);
-nil(__stdcall* glDeleteShader)(u32 _shader);
-nil(__stdcall* glEnableVertexAttribArray)(u32 index);
-nil(__stdcall* glVertexAttribPointer)(u32 index, i32 sprite_size, u32 type, u8 normalized, i32 stride, const void* pointer);
-nil(__stdcall* glGenTextures)(i32 n, u32* textures);
-nil(__stdcall* glBindTexture)(u32 target, u32 _atlas_texture);
-nil(__stdcall* glTexParameteri)(u32 target, u32 pname, u32 params);
-nil(__stdcall* glTexImage2D)(u32 target, i32 level, i32 internalformat, i32 sprite_width, i32 height, i32 border, u32 format, u32 type, const void* pixels);
-nil(__stdcall* glGenerateMipmap)(u32 target);
-nil(__stdcall* glDrawElements)(u32 mode, i32 count, u32 type, const void* indices);
-nil(__stdcall* glViewport)(i32 x, i32 y, i32 sprite_width, i32 height);
-nil(__stdcall* glClearColor)(f32 red, f32 green, f32 blue, f32 alpha);
-nil(__stdcall* glClear)(u32 mask);
-nil(__stdcall* glUseProgram)(u32 program);
-nil(__stdcall* glTranslatef)(f32 x, f32 y, f32 z);
-nil(__stdcall* glScalef)(f32 x, f32 y, f32 z);
-nil(__stdcall* glRotatef)(f32 angle, f32 x, f32 y, f32 z);
-nil(__stdcall* glMatrixMode)(u32 mode);
-nil(__stdcall* glLoadIdentity)();
-nil(__stdcall* glRotatef)(f32 angle, f32 x, f32 y, f32 z);
-nil(__stdcall* glOrtho)(f64 left, f64 right, f64 bottom, f64 top, f64 zNear, f64 zFar);
+void(__stdcall* glAttachShader)(u32 program, u32 _shader);
+void(__stdcall* glLinkProgram)(u32 program);
+void(__stdcall* glGetProgramiv)(u32 program, u32 pname, int* params);
+void(__stdcall* glGetProgramInfoLog)(u32 program, i32 bufSize, i32* length, char* infoLog);
+void(__stdcall* glGetShaderInfoLog)(u32 _shader, i32 bufSize, i32* length, char* infoLog);
+void(__stdcall* glDeleteShader)(u32 _shader);
+void(__stdcall* glEnableVertexAttribArray)(u32 index);
+void(__stdcall* glVertexAttribPointer)(u32 index, i32 sprite_size, u32 type, u8 normalized, i32 stride, const void* pointer);
+void(__stdcall* glGenTextures)(i32 n, u32* textures);
+void(__stdcall* glBindTexture)(u32 target, u32 _atlas_texture);
+void(__stdcall* glTexParameteri)(u32 target, u32 pname, u32 params);
+void(__stdcall* glTexImage2D)(u32 target, i32 level, i32 internalformat, i32 sprite_width, i32 height, i32 border, u32 format, u32 type, const void* pixels);
+void(__stdcall* glGenerateMipmap)(u32 target);
+void(__stdcall* glDrawElements)(u32 mode, i32 count, u32 type, const void* indices);
+void(__stdcall* glViewport)(i32 x, i32 y, i32 sprite_width, i32 height);
+void(__stdcall* glClearColor)(f32 red, f32 green, f32 blue, f32 alpha);
+void(__stdcall* glClear)(u32 mask);
+void(__stdcall* glUseProgram)(u32 program);
+void(__stdcall* glTranslatef)(f32 x, f32 y, f32 z);
+void(__stdcall* glScalef)(f32 x, f32 y, f32 z);
+void(__stdcall* glRotatef)(f32 angle, f32 x, f32 y, f32 z);
+void(__stdcall* glMatrixMode)(u32 mode);
+void(__stdcall* glLoadIdentity)();
+void(__stdcall* glRotatef)(f32 angle, f32 x, f32 y, f32 z);
+void(__stdcall* glOrtho)(f64 left, f64 right, f64 bottom, f64 top, f64 zNear, f64 zFar);
 u32(__stdcall* glGetError)();
 void* (__stdcall* glMapBuffer)(u32 target, u32 access);
 u8(__stdcall* glUnmapBuffer)(u32 target);
@@ -637,6 +637,7 @@ void openlgl_setup_vertex_attributes(u32 shader, const ShaderAttribute attribute
 // Sprite renderer
 
 typedef struct {
+	const char* name;
 	u32 atlas_x, atlas_y;
 	u32 sprite_width, sprite_height;
 } AtlasSpriteInfo;
@@ -748,36 +749,45 @@ bool sprite_renderer_init_atlas_shader()
 void sprite_renderer_init_atlas_texture()
 {
 	// ChatGPT
-
 	u32 atlas_width = 1000, atlas_height = 1000;
 	u32 atlas_size = atlas_width * atlas_height;
-
 	// Allocate memory for the sprite atlas
 	u8* atlas_data = (u8*) malloc(atlas_size * 4);
+	fail_if_false(atlas_data);
+
 	memset(atlas_data, 0, atlas_size * 4);
 
 	// Copy each sprite into the atlas
 	int x = 0, y = 0;
-	for(u32 i = 0; i < g_sprite_renderer_texture_resources_count; i++) {
+	for(u32 sprite_index = 0; sprite_index < g_sprite_renderer_texture_resources_count; sprite_index++)
+	{
 		i32 sprite_width, sprite_height, sprite_components;
-		u8* sprite_data = stbi_load(g_sprite_renderer_texture_resources[i].path, &sprite_width, &sprite_height, &sprite_components, STBI_default);
-		g_sprite_renderer_atlas_sprite_info[i].atlas_x = x;
-		g_sprite_renderer_atlas_sprite_info[i].atlas_y = y;
-		g_sprite_renderer_atlas_sprite_info[i].sprite_width = sprite_width;
-		g_sprite_renderer_atlas_sprite_info[i].sprite_height = sprite_height;
 
+		u8* sprite_data = stbi_load(g_sprite_renderer_texture_resources[sprite_index].path,
+			&sprite_width, &sprite_height, &sprite_components, STBI_default);
+
+		fail_if_false(sprite_data);
+
+		u8* sprite_data2 = stbi_load(g_sprite_renderer_texture_resources[sprite_index].path,
+			&sprite_width, &sprite_height, &sprite_components, STBI_default);
+
+		g_sprite_renderer_atlas_sprite_info[sprite_index].name = g_sprite_renderer_texture_resources[sprite_index].path;
+		g_sprite_renderer_atlas_sprite_info[sprite_index].atlas_x = x;
+		g_sprite_renderer_atlas_sprite_info[sprite_index].atlas_y = y;
+		g_sprite_renderer_atlas_sprite_info[sprite_index].sprite_width = sprite_width;
+		g_sprite_renderer_atlas_sprite_info[sprite_index].sprite_height = sprite_height;
+		g_sprite_renderer_atlas_sprite_info_count++;
 		for(int row = 0; row < sprite_height; row++)
 		{
 			u32 atlas_row_offset = row * atlas_width;
-			//atlas_row_offset += (y*atlas_width)
+			atlas_row_offset += x;
+
 			u32 sprite_row_offset = row * sprite_width;
 
-			memcpy(
-				atlas_data + atlas_row_offset * 4,
+			memcpy(atlas_data + atlas_row_offset * 4,
 				sprite_data + sprite_row_offset * 4,
 				sprite_width * 4);
 		}
-
 
 		x += sprite_width;
 		if(x + atlas_width > atlas_size) {
@@ -816,29 +826,55 @@ void sprite_renderer_init()
 	sprite_renderer_init_atlas_texture();
 }
 
+AtlasSpriteRenderData* sprites;
+u32 sprite_count = 0;
+
+const AtlasSpriteInfo* sprite_renderer_get_sprite_info_by_name(const ch8* sprite_name)
+{
+	for(size_t sprite_info_index = 0; sprite_info_index < g_sprite_renderer_atlas_sprite_info_count; sprite_info_index++)
+	{
+		AtlasSpriteInfo* sprite_info = &g_sprite_renderer_atlas_sprite_info[sprite_info_index];
+
+		if(strstr(sprite_info->name, sprite_name))
+		{
+			return sprite_info;
+		}
+	}
+
+	return null;
+}
+
+void sprite_renderer_push_sprite(const char* sprite_name, int x, int y)
+{
+	f32 scale = 1.f;
+
+	AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
+
+	AtlasSpriteRenderData* sprite = &sprites[sprite_count++];
+	sprite->atlas_x = (f32) sprite_info->atlas_x;
+	sprite->atlas_y = (f32) sprite_info->atlas_y;
+	sprite->sprite_width = (f32) sprite_info->sprite_width;
+	sprite->sprite_height = (f32) sprite_info->sprite_height;
+	sprite->screen_x = x;
+	sprite->screen_y = y;
+	sprite->scale = scale;
+}
+
 void sprite_renderer_render()
 {
-	AtlasSpriteRenderData* sprites;
-	u32 sprite_count = 0;
-
 	glClearColor(1, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	gl_fail_if_false(sprites = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY));
 
-	sprites[0].atlas_x = (f32) g_sprite_renderer_atlas_sprite_info[0].atlas_x;
-	sprites[0].atlas_y = (f32) g_sprite_renderer_atlas_sprite_info[0].atlas_y;
-	sprites[0].sprite_width = (f32) g_sprite_renderer_atlas_sprite_info[0].sprite_width;
-	sprites[0].sprite_height = (f32) g_sprite_renderer_atlas_sprite_info[0].sprite_height;
-	sprites[0].screen_x = 0;
-	sprites[0].screen_y = 0;
-	sprites[0].scale = 0.95;
-	sprite_count++;
+	sprite_renderer_push_sprite("room.png",0,0);
+	sprite_renderer_push_sprite("test.png",300,300);
 
 	gl_fail_if_false(glUnmapBuffer(GL_SHADER_STORAGE_BUFFER));
 
 	gl_fail_if_false(glDrawElements(GL_TRIANGLES, sprite_count * 6, GL_UNSIGNED_INT, 0));
 
+	sprite_count = 0;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1032,6 +1068,8 @@ int main(int argc, const char** argv)
 		sprite_renderer_render();
 
 		SwapBuffers(g_device_context);
+
+		Sleep(10);
 	}
 
 	return 0;
