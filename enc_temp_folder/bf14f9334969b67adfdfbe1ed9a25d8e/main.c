@@ -666,11 +666,8 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 		}
 		case WM_MOUSEMOVE:
 		{
-			#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
-			#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
-
-		    g_cursor_x = GET_X_LPARAM(lparam);
-            g_cursor_y = GET_Y_LPARAM(lparam);
+		    g_cursor_x = HIWORD(lparam);
+            g_cursor_y = LOWORD(lparam);
 
             // Do something with the mouse position
             // ...

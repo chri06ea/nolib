@@ -670,7 +670,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 			#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
 		    g_cursor_x = GET_X_LPARAM(lparam);
-            g_cursor_y = GET_Y_LPARAM(lparam);
+            g_cursor_y = LOWORD(lparam);
 
             // Do something with the mouse position
             // ...
