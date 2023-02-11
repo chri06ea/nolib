@@ -52,8 +52,8 @@ void main()
 	}
 	else
 	{
-		float ndc_w = 2.0 / 800;
-		float ndc_h = 2.0 / 600;
+		float ndc_w = 2.0 / 800.0;
+		float ndc_h = 2.0 / 600.0;
 	
 		float px0 = -1.0 + (s.pos.x * ndc_w);
 		float py0 = +1.0 - (s.pos.y * ndc_h);

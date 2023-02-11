@@ -14,9 +14,9 @@ void main()
 	
 	if(textureColor.a == 0.0)
 	{
-		//textureColor.r = 1.0;
 		discard;
 	}
+
 	//color = texture(image, vec2(0,1));
 	color = _color * textureColor;  
 };

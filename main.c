@@ -461,6 +461,22 @@ typedef struct {
 #define GL_READ_ONLY 0x88B8
 #define GL_WRITE_ONLY 0x88B9
 #define GL_READ_WRITE 0x88BA
+#define GL_BLEND_DST 0x0BE0
+#define GL_BLEND_SRC 0x0BE1
+#define GL_BLEND 0x0BE2
+#define GL_SRC_COLOR 0x0300
+#define GL_ONE_MINUS_SRC_COLOR 0x0301
+#define GL_SRC_ALPHA 0x0302
+#define GL_ONE_MINUS_SRC_ALPHA 0x0303
+#define GL_DST_ALPHA 0x0304
+#define GL_ONE_MINUS_DST_ALPHA 0x0305
+#define GL_DST_COLOR 0x0306
+#define GL_ONE_MINUS_DST_COLOR 0x0307
+#define GL_SRC_ALPHA_SATURATE 0x0308
+#define GL_SRGB 0x8C40
+#define GL_SRGB8 0x8C41
+#define GL_SRGB_ALPHA 0x8C42
+#define GL_SRGB8_ALPHA8 0x8C43
 
 void(__stdcall* glBindBuffer)(u32 target, u32 buffer);
 void(__stdcall* glGenBuffers)(i32 count, u32* buffers);
@@ -500,6 +516,9 @@ void(__stdcall* glOrtho)(f64 left, f64 right, f64 bottom, f64 top, f64 zNear, f6
 u32(__stdcall* glGetError)();
 void* (__stdcall* glMapBuffer)(u32 target, u32 access);
 u8(__stdcall* glUnmapBuffer)(u32 target);
+u8(__stdcall* glEnable)(u32 a1);
+u8(__stdcall* glDisable)(u32 a1);
+u8(__stdcall* glBlendFunc)(u32 a1, u32 a2);
 
 int _t_gl_error = 0;
 #define gl_fail_if_false(x) x; if((_t_gl_error = glGetError()) != 0) { printf("gl_assert: %d\n", _t_gl_error); __debugbreak(); }
@@ -550,6 +569,9 @@ void opengl_init_pointers()
 	fail_if_false(glBindBufferBase = wgl_get_proc_address(opengl_module_handle, "glBindBufferBase"));
 	fail_if_false(glMapBuffer = wgl_get_proc_address(opengl_module_handle, "glMapBuffer"));
 	fail_if_false(glUnmapBuffer = wgl_get_proc_address(opengl_module_handle, "glUnmapBuffer"));
+	fail_if_false(glEnable = wgl_get_proc_address(opengl_module_handle, "glEnable"));
+	fail_if_false(glDisable = wgl_get_proc_address(opengl_module_handle, "glDisable"));
+	fail_if_false(glBlendFunc = wgl_get_proc_address(opengl_module_handle, "glBlendFunc"));
 }
 
 u32 opengl_compile_shader(const char* shader_source, const char* shader_type)
@@ -669,13 +691,10 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 			#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 			#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
-		    g_cursor_x = GET_X_LPARAM(lparam);
-            g_cursor_y = GET_Y_LPARAM(lparam);
+			g_cursor_x = GET_X_LPARAM(lparam);
+			g_cursor_y = GET_Y_LPARAM(lparam);
 
-            // Do something with the mouse position
-            // ...
-
-            break;
+			break;
 		}
 		default:
 			return DefWindowProcA(window, msg, wparam, lparam);
@@ -909,8 +928,7 @@ void sprite_renderer_init_atlas_shader()
 
 void sprite_renderer_init_atlas_texture()
 {
-	// ChatGPT
-	u32 atlas_width = 1000, atlas_height = 1000;
+	u32 atlas_width = 5000, atlas_height = 5000;
 	u32 atlas_size = atlas_width * atlas_height;
 	// Allocate memory for the sprite atlas
 	u8* atlas_data = (u8*) malloc(atlas_size * 4);
@@ -928,9 +946,6 @@ void sprite_renderer_init_atlas_texture()
 			&sprite_width, &sprite_height, &sprite_components, STBI_default);
 
 		fail_if_false(sprite_data);
-
-		u8* sprite_data2 = stbi_load(g_sprite_renderer_texture_resources[sprite_index].path,
-			&sprite_width, &sprite_height, &sprite_components, STBI_default);
 
 		g_sprite_renderer_atlas_sprite_info[sprite_index].name = g_sprite_renderer_texture_resources[sprite_index].path;
 		g_sprite_renderer_atlas_sprite_info[sprite_index].atlas_x = x;
@@ -956,10 +971,14 @@ void sprite_renderer_init_atlas_texture()
 			x = 0;
 			y += atlas_height;
 		}
+
+		fail_if_false(x < atlas_width && y < atlas_height);
+
 		stbi_image_free(sprite_data);
 	}
 
 	#ifdef OPENGL
+
 	gl_fail_if_false(glGenTextures(1, &g_sprite_renderer_atlas_texture_handle));
 	gl_fail_if_false(glBindTexture(GL_TEXTURE_2D, g_sprite_renderer_atlas_texture_handle));
 	// set the texture wrapping/filtering options (on the currently bound texture object)
@@ -991,12 +1010,8 @@ void sprite_renderer_init()
 void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen)
 {
 	const AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
-	sprite_renderer_render_new_sprite(sprite_info);
-	AtlasSpriteRenderData* sprite = &g_sprite_renderer_render_buffer[g_sprite_renderer_render_buffer_count++];
-	sprite->atlas_x = (f32) sprite_info->atlas_x;
-	sprite->atlas_y = (f32) sprite_info->atlas_y;
-	sprite->sprite_width = (f32) sprite_info->sprite_width;
-	sprite->sprite_height = (f32) sprite_info->sprite_height;
+	AtlasSpriteRenderData* sprite = sprite_renderer_render_new_sprite(sprite_info);
+
 	sprite->screen_x = (f32) x;
 	sprite->screen_y = (f32) y;
 	sprite->scale = scale;
@@ -1024,12 +1039,12 @@ void sprite_renderer_render()
 	sprite_renderer_render_begin();
 
 	sprite_renderer_push_sprite("room.png", 0, 0, 1, true);
+	sprite_renderer_push_sprite("ui.png", 0, 0, 1, true);
 	sprite_renderer_push_sprite("test.png", 300, 300, 3, false);
 	sprite_renderer_push_sprite("cola.png", 470, 330, 1, false);
 
-	int bx = 300, by = 400;
+	sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false);
 
-	sprite_renderer_push_sprite("ok_button.png", g_cursor_x, g_cursor_y, 3, false);
 	sprite_renderer_render_end();
 }
 
@@ -1117,7 +1132,7 @@ int main(int argc, const char** argv)
 
 		SwapBuffers(g_device_context);
 
-		Sleep(10);
+		Sleep(1);
 	}
 
 	return 0;
