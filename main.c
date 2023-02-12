@@ -166,7 +166,7 @@ ch8* str_concat(ch8* s1, ch8* s2)
 typedef struct {
 	void* buffer;
 	u32 buffer_size;
-	const char* path;
+	const ch8* path;
 	u32 size;
 	u32 last_write_time;
 	u32 resource_open_fail_count;
@@ -234,7 +234,7 @@ bool resource_create_or_update_from_path(Resource* resource)
 	#endif
 }
 
-void resource_init_from_path(const char* path, Resource* resource)
+void resource_init_from_path(const ch8* path, Resource* resource)
 {
 	resource->buffer = 0;
 	resource->buffer_size = 0;
@@ -251,7 +251,7 @@ bool resource_update(Resource* resource)
 	return resource_create_or_update_from_path(resource);
 }
 
-void resource_init_from_folder(const char* path, Resource* resources, u32* resource_count, u32 resources_max_count)
+void resource_init_from_folder(const ch8* path, Resource* resources, u32* resource_count, u32 resources_max_count)
 {
 	char find_fild_path[MAX_PATH];
 	sprintf_s(find_fild_path, sizeof(find_fild_path), "%s/*", path);
@@ -574,7 +574,7 @@ void opengl_init_pointers()
 	fail_if_false(glBlendFunc = wgl_get_proc_address(opengl_module_handle, "glBlendFunc"));
 }
 
-u32 opengl_compile_shader(const char* shader_source, const char* shader_type)
+u32 opengl_compile_shader(const ch8* shader_source, const ch8* shader_type)
 {
 	u32 shader_type_id;
 
@@ -659,6 +659,11 @@ void openlgl_setup_vertex_attributes(u32 shader, const ShaderAttribute attribute
 	}
 }
 
+
+// Input
+
+u8 g_input_key_states[0xFF];
+
 //////////////////////////////////////////////////////////////////////
 // Window
 
@@ -674,6 +679,20 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 
 	switch(msg)
 	{
+		case WM_CHAR:
+		{
+			break;
+		};
+		case WM_KEYDOWN:
+		{
+			g_input_key_states[wparam] = 1;
+			break;
+		}
+		case WM_KEYUP:
+		{
+			g_input_key_states[wparam] = 0;
+			break;
+		}
 		case WM_SIZE:
 		{
 			RECT client_rect;
@@ -930,13 +949,12 @@ void sprite_renderer_init_atlas_texture()
 {
 	u32 atlas_width = 5000, atlas_height = 5000;
 	u32 atlas_size = atlas_width * atlas_height;
-	// Allocate memory for the sprite atlas
+
 	u8* atlas_data = (u8*) malloc(atlas_size * 4);
 	fail_if_false(atlas_data);
 
 	memset(atlas_data, 0, atlas_size * 4);
 
-	// Copy each sprite into the atlas
 	int x = 0, y = 0;
 	for(u32 sprite_index = 0; sprite_index < g_sprite_renderer_texture_resources_count; sprite_index++)
 	{
@@ -972,7 +990,7 @@ void sprite_renderer_init_atlas_texture()
 			y += atlas_height;
 		}
 
-		fail_if_false(x < atlas_width && y < atlas_height);
+		fail_if_false(x < atlas_width&& y < atlas_height);
 
 		stbi_image_free(sprite_data);
 	}
@@ -989,6 +1007,7 @@ void sprite_renderer_init_atlas_texture()
 	// generate the texture (and mipmap)
 	gl_fail_if_false(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas_width, atlas_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlas_data));
 	gl_fail_if_false(glGenerateMipmap(GL_TEXTURE_2D));
+
 	#endif
 
 	free(atlas_data);
@@ -1032,20 +1051,8 @@ void sprite_renderer_render_end()
 {
 	gl_fail_if_false(glUnmapBuffer(GL_SHADER_STORAGE_BUFFER));
 	gl_fail_if_false(glDrawElements(GL_TRIANGLES, g_sprite_renderer_render_buffer_count * 6, GL_UNSIGNED_INT, 0));
-}
 
-void sprite_renderer_render()
-{
-	sprite_renderer_render_begin();
-
-	sprite_renderer_push_sprite("room.png", 0, 0, 1, true);
-	sprite_renderer_push_sprite("ui.png", 0, 0, 1, true);
-	sprite_renderer_push_sprite("test.png", 300, 300, 3, false);
-	sprite_renderer_push_sprite("cola.png", 470, 330, 1, false);
-
-	sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false);
-
-	sprite_renderer_render_end();
+	fail_if_false(SwapBuffers(g_device_context));
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1128,9 +1135,18 @@ int main(int argc, const char** argv)
 
 		window_process_messages();
 
-		sprite_renderer_render();
+		{
+			sprite_renderer_render_begin();
 
-		SwapBuffers(g_device_context);
+			sprite_renderer_push_sprite("room2.png", 0, 0, 1, true);
+			sprite_renderer_push_sprite("ui.png", 0, 0, 1, true);
+			sprite_renderer_push_sprite("test.png", 300, 300, 3, false);
+			sprite_renderer_push_sprite("cola.png", 470, 330, 1, false);
+			sprite_renderer_push_sprite("pot_simple.png", 470, 330, 2, false);
+			sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false);
+
+			sprite_renderer_render_end();
+		}
 
 		Sleep(1);
 	}
