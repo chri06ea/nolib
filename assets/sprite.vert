@@ -8,8 +8,9 @@ struct Sprite
 	vec2 pos;
 	vec2 size;
 	vec2 atlas_offset;
-	double scale;
+	float scale;
 	bool full_screen;
+	vec4 color;
 };
 
 layout(std430, binding = 0) buffer VertexData
@@ -36,7 +37,7 @@ void main()
 		
 	_uv = uvs[vertex_index];
 	
-	_color = vec4(1, 1, 1, 1);
+	_color = s.color;
 	
 	if(s.full_screen)
 	{

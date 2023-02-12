@@ -691,7 +691,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 		case WM_KEYUP:
 		{
 			g_input_key_states[wparam] = 0;
-			break;
+a			break;
 		}
 		case WM_SIZE:
 		{
@@ -811,8 +811,9 @@ typedef struct {
 	f32 screen_x, screen_y;
 	f32 sprite_width, sprite_height;
 	f32 atlas_x, atlas_y;
-	double scale;
-	u8 full_screen;
+	f32 scale;
+	u32 full_screen;
+	c4f color;
 } AtlasSpriteRenderData;
 
 Resource g_sprite_render_atlas_vertex_shader_resource;
@@ -926,7 +927,7 @@ void sprite_renderer_init_atlas_index_buffer()
 	gl_fail_if_false(glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER));
 }
 
-void sprite_renderer_init_atlas_shader()
+bool sprite_renderer_init_atlas_shader()
 {
 	#ifdef OPENGL
 	u32 vertex_shader = opengl_compile_shader(g_sprite_render_atlas_vertex_shader_resource.buffer, "vertex");
@@ -943,6 +944,8 @@ void sprite_renderer_init_atlas_shader()
 	#endif
 
 	fail_if_false(false);
+
+	return true;
 }
 
 void sprite_renderer_init_atlas_texture()
@@ -1026,7 +1029,7 @@ void sprite_renderer_init()
 	sprite_renderer_init_atlas_texture();
 }
 
-void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen)
+void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen, const c4f* color)
 {
 	const AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
 	AtlasSpriteRenderData* sprite = sprite_renderer_render_new_sprite(sprite_info);
@@ -1035,6 +1038,7 @@ void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale
 	sprite->screen_y = (f32) y;
 	sprite->scale = scale;
 	sprite->full_screen = full_screen;
+	sprite->color = *color;
 }
 
 void sprite_renderer_render_begin()
@@ -1137,13 +1141,30 @@ int main(int argc, const char** argv)
 
 		{
 			sprite_renderer_render_begin();
+			const c4f C4F_RED = {
+				1.f, 0.f, 0.f, 1.f
+			};
+			const c4f C4F_GREEN = {
+				0.f, 1.f, 0.f, 1.f
+			};
+			const c4f C4F_BLUE = {
+				0.f, 0.f, 1.f, 1.f
+			};
+			sprite_renderer_push_sprite("room2.png", 0, 0, 1, true, &C4F_GREEN);
+			sprite_renderer_push_sprite("ui.png", 0, 0, 1, true, &C4F_GREEN);
+			sprite_renderer_push_sprite("test.png", 300, 300, 3, false, &C4F_GREEN);
+			sprite_renderer_push_sprite("pot_simple.png", 470, 330, 2, false, &C4F_GREEN);
 
-			sprite_renderer_push_sprite("room2.png", 0, 0, 1, true);
-			sprite_renderer_push_sprite("ui.png", 0, 0, 1, true);
-			sprite_renderer_push_sprite("test.png", 300, 300, 3, false);
-			sprite_renderer_push_sprite("cola.png", 470, 330, 1, false);
-			sprite_renderer_push_sprite("pot_simple.png", 470, 330, 2, false);
-			sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false);
+			if(g_input_key_states['A'])
+			{
+				sprite_renderer_push_sprite("cola.png", 470, 330, 1, false, &C4F_GREEN);
+			}
+			else
+			{
+				sprite_renderer_push_sprite("cola.png", 470, 330, 1, false, &C4F_BLUE);
+
+			}
+				sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false, &C4F_GREEN);
 
 			sprite_renderer_render_end();
 		}
