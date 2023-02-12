@@ -5,15 +5,21 @@ out vec4 _color;
 
 struct Sprite
 {
-	vec2 pos;
-	vec2 size;
-	vec2 atlas_offset;
+	vec2 screen_pos;
+	vec2 screen_size;
+	vec2 sprite_atlas_pos;
+	vec2 sprite_size;
+	vec4 color;
+
 	float scale;
 	bool full_screen;
-	vec4 color;
+	
+	// TODO: Find out why this padding is needed
+	bool ff2;
+	float ff3;
 };
 
-layout(std430, binding = 0) buffer VertexData
+layout(std140, binding = 0) buffer VertexData
 {
     Sprite sprites[];
 };
@@ -29,10 +35,10 @@ void main()
 
 	vec2 uvs[4] = 
     {
-		vec2(s.atlas_offset.x, s.atlas_offset.y),
-		vec2(s.atlas_offset.x + s.size.x, s.atlas_offset.y),
-		vec2(s.atlas_offset.x, s.atlas_offset.y + s.size.y),
-		vec2(s.atlas_offset.x + s.size.x, s.atlas_offset.y + s.size.y),
+		vec2(s.sprite_atlas_pos.x, s.sprite_atlas_pos.y),
+		vec2(s.sprite_atlas_pos.x + s.sprite_size.x, s.sprite_atlas_pos.y),
+		vec2(s.sprite_atlas_pos.x, s.sprite_atlas_pos.y + s.sprite_size.y),
+		vec2(s.sprite_atlas_pos.x + s.sprite_size.x, s.sprite_atlas_pos.y + s.sprite_size.y),
     };
 		
 	_uv = uvs[vertex_index];
@@ -56,10 +62,10 @@ void main()
 		float ndc_w = 2.0 / 800.0;
 		float ndc_h = 2.0 / 600.0;
 	
-		float px0 = -1.0 + (s.pos.x * ndc_w);
-		float py0 = +1.0 - (s.pos.y * ndc_h);
-		float px1 = -1.0 + ((s.pos.x + s.size.x * float(s.scale)) * ndc_w);
-		float py1 = +1.0 - ((s.pos.y + s.size.y * float(s.scale)) * ndc_h);
+		float px0 = -1.0 + (s.screen_pos.x * ndc_w);
+		float py0 = +1.0 - (s.screen_pos.y * ndc_h);
+		float px1 = -1.0 + ((s.screen_pos.x + s.screen_size.x * s.scale) * ndc_w);
+		float py1 = +1.0 - ((s.screen_pos.y + s.screen_size.y * s.scale) * ndc_h);
 	
 		vec2 vertices[4] = 
 		{

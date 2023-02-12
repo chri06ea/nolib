@@ -808,13 +808,21 @@ typedef struct {
 } AtlasSpriteInfo;
 
 typedef struct {
-	f32 screen_x, screen_y;
-	f32 sprite_width, sprite_height;
-	f32 atlas_x, atlas_y;
-	f32 scale;
-	u32 full_screen;
+	v2f screen_pos;
+	s2f screen_size;
+	v2f sprite_atlas_pos;
+	s2f sprite_size;
 	c4f color;
+
+	float scale;
+	bool full_screen;
+	// TODO: Find out why this padding is needed
+	float ff2;
+	float ff3;
+
 } AtlasSpriteRenderData;
+
+#pragma pack(pop)
 
 Resource g_sprite_render_atlas_vertex_shader_resource;
 Resource g_sprite_render_atlas_fragment_shader_resource;
@@ -876,10 +884,12 @@ const AtlasSpriteInfo* sprite_renderer_get_sprite_info_by_name(const ch8* sprite
 AtlasSpriteRenderData* sprite_renderer_render_new_sprite(const AtlasSpriteInfo* sprite_info)
 {
 	AtlasSpriteRenderData* sprite = &g_sprite_renderer_render_buffer[g_sprite_renderer_render_buffer_count++];
-	sprite->atlas_x = (f32) sprite_info->atlas_x;
-	sprite->atlas_y = (f32) sprite_info->atlas_y;
-	sprite->sprite_width = (f32) sprite_info->sprite_width;
-	sprite->sprite_height = (f32) sprite_info->sprite_height;
+	sprite->screen_size.w = (f32) sprite_info->sprite_width;
+	sprite->screen_size.h = (f32) sprite_info->sprite_height;
+	sprite->sprite_size.w = (f32) sprite_info->sprite_width;
+	sprite->sprite_size.h = (f32) sprite_info->sprite_height;
+	sprite->sprite_atlas_pos.x = (f32) sprite_info->atlas_x;
+	sprite->sprite_atlas_pos.y = (f32) sprite_info->atlas_y;
 
 	return sprite;
 }
@@ -940,7 +950,7 @@ bool sprite_renderer_init_atlas_shader()
 
 	gl_fail_if_false(glUseProgram(g_sprite_renderer_atlas_shader_handle));
 
-	return;
+	return true;
 	#endif
 
 	fail_if_false(false);
@@ -1034,8 +1044,8 @@ void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale
 	const AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
 	AtlasSpriteRenderData* sprite = sprite_renderer_render_new_sprite(sprite_info);
 
-	sprite->screen_x = (f32) x;
-	sprite->screen_y = (f32) y;
+	sprite->screen_pos.x = (f32) x;
+	sprite->screen_pos.y = (f32) y;
 	sprite->scale = scale;
 	sprite->full_screen = full_screen;
 	sprite->color = *color;
@@ -1141,6 +1151,9 @@ int main(int argc, const char** argv)
 
 		{
 			sprite_renderer_render_begin();
+			const c4f C4F_WHITE = {
+				1.f, 1.f, 1.f, 1.f
+			};
 			const c4f C4F_RED = {
 				1.f, 0.f, 0.f, 1.f
 			};
@@ -1150,10 +1163,38 @@ int main(int argc, const char** argv)
 			const c4f C4F_BLUE = {
 				0.f, 0.f, 1.f, 1.f
 			};
+
 			sprite_renderer_push_sprite("room2.png", 0, 0, 1, true, &C4F_GREEN);
 			sprite_renderer_push_sprite("ui.png", 0, 0, 1, true, &C4F_GREEN);
 			sprite_renderer_push_sprite("test.png", 300, 300, 3, false, &C4F_GREEN);
-			sprite_renderer_push_sprite("pot_simple.png", 470, 330, 2, false, &C4F_GREEN);
+
+
+			f32 xpos = 0.f;
+			for(size_t i = 0; i < 10; i++)
+			{
+				if(g_cursor_x >= xpos && g_cursor_x < xpos + 48.f)
+				{
+					if(g_input_key_states['A'])
+					{
+						sprite_renderer_push_sprite("radio.png", xpos, 0, 1.0, false, &C4F_RED);
+					}
+					else
+					{
+						sprite_renderer_push_sprite("radio.png", xpos, 0, 2.0, false, &C4F_WHITE);
+					}
+
+				}
+				else
+				{
+					sprite_renderer_push_sprite("radio.png", xpos, 0, 1.0, false, &C4F_GREEN);
+
+				}
+				xpos += 48.f;
+			}
+
+			sprite_renderer_push_sprite("seedling.png", 100, 100, 1.5, false, &C4F_GREEN);
+
+			sprite_renderer_push_sprite("pot_simple.png", window_width / 2.f, window_height / 2.f, 2, false, &C4F_GREEN);
 
 			if(g_input_key_states['A'])
 			{
@@ -1164,7 +1205,7 @@ int main(int argc, const char** argv)
 				sprite_renderer_push_sprite("cola.png", 470, 330, 1, false, &C4F_BLUE);
 
 			}
-				sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false, &C4F_GREEN);
+			sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false, &C4F_GREEN);
 
 			sprite_renderer_render_end();
 		}
