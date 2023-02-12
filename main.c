@@ -691,7 +691,7 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 		case WM_KEYUP:
 		{
 			g_input_key_states[wparam] = 0;
-a			break;
+			break;
 		}
 		case WM_SIZE:
 		{
