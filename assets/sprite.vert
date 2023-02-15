@@ -76,24 +76,5 @@ void main()
 		};
 
 		gl_Position = vec4(vertices[vertex_index], 0, 1);
-
-		//float screen_width =  1024.0;
-		//float screen_height = 768.0;
-		//
-		//float px0 = -1.0 + (((s.screen_pos.x)) / screen_width) * 2;
-		//float py0 = +1.0 - (((s.screen_pos.y)) / screen_height) * 2;
-		//
-		//float px1 = -1.0 + (((s.screen_pos.x + s.screen_size.x)) / screen_width) * 2;
-		//float py1 = +1.0 - (((s.screen_pos.y + s.screen_size.y)) / screen_height) * 2;
-		//
-		//vec2 vertices[4] = 
-		//{
-		//	vec2(px0, py0), // TL
-		//	vec2(px1, py0), // TR
-		//	vec2(px0, py1), // BL
-		//	vec2(px1, py1), // BR
-		//};
-		//
-		//gl_Position = vec4(vertices[vertex_index], 0, 1);
 	}
 };

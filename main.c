@@ -846,7 +846,7 @@ typedef struct {
 Resource g_sprite_render_atlas_vertex_shader_resource;
 Resource g_sprite_render_atlas_fragment_shader_resource;
 
-#define g_sprite_renderer_texture_resources_max_count 64
+#define g_sprite_renderer_texture_resources_max_count 1024
 Resource g_sprite_renderer_texture_resources[g_sprite_renderer_texture_resources_max_count];
 u32 g_sprite_renderer_texture_resources_count = 0;
 
@@ -861,6 +861,8 @@ u32 g_sprite_renderer_index_buffer_handle;
 u32 g_sprite_renderer_storage_buffer_handle;
 u32 g_sprite_renderer_atlas_shader_handle;
 u32 g_sprite_renderer_atlas_texture_handle;
+
+u32 g_sprite_renderer_render_count = 0;
 
 const ShaderAttribute g_sprite_render_shader_attributes[MAX_SHADER_ATTRIBUTES] = {
 	{.type = GL_FLOAT, .count = 0},
@@ -1061,12 +1063,12 @@ void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale
 
 void sprite_renderer_render_begin()
 {
+	g_sprite_renderer_render_buffer_count = 0;
+
 	gl_fail_if_false(glClearColor(1, 0, 0, 1));
 	gl_fail_if_false(glClear(GL_COLOR_BUFFER_BIT));
 
 	gl_fail_if_false(g_sprite_renderer_render_buffer = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY));
-
-	g_sprite_renderer_render_buffer_count = 0;
 }
 
 void sprite_renderer_render_end()
@@ -1075,9 +1077,11 @@ void sprite_renderer_render_end()
 	gl_fail_if_false(glDrawElements(GL_TRIANGLES, g_sprite_renderer_render_buffer_count * 6, GL_UNSIGNED_INT, 0));
 
 	fail_if_false(SwapBuffers(g_device_context));
+
+	g_sprite_renderer_render_count++;
 }
 
-void sprite_renderer_push_text(const char* text, float scale)
+void sprite_renderer_push_text(const char* text, u32 x, u32 y, f32 scale)
 {
 	u32 text_length = str_length(text);
 
@@ -1085,6 +1089,12 @@ void sprite_renderer_push_text(const char* text, float scale)
 
 	for(size_t character_index = 0; character_index < text_length; character_index++)
 	{
+		if(text[character_index] == ' ')
+		{
+			x_offset += 3;
+			continue;
+		}
+
 		ch8 texture_name[MAX_PATH];
 		sprintf_s(texture_name, sizeof(texture_name), "c_%c.png", text[character_index]);
 
@@ -1094,13 +1104,14 @@ void sprite_renderer_push_text(const char* text, float scale)
 
 			if(strstr(sprite_info->name, texture_name))
 			{
-				sprite_renderer_push_sprite(texture_name, x_offset, 0, scale / 3, false, &C4F_WHITE);
+				sprite_renderer_push_sprite(texture_name, x + x_offset, y + y_offset, scale, false, &C4F_WHITE);
 
 				x_offset += sprite_info->sprite_width + 1;
+
+				break;
 			}
 		}
 	}
-
 }
 
 void sprite_renderer_init()
@@ -1196,11 +1207,12 @@ void game_render()
 	{
 		GameObject* game_object = &game_objects[i];
 
-		sprite_renderer_push_sprite("radio.png", DEFAULT_WINDOW_WIDTH - 48, 0, 1.0, false, &C4F_WHITE);
+		ch8 frame_count_text[128];
+		sprintf_s(frame_count_text, sizeof(frame_count_text), "render count %d", g_sprite_renderer_render_count);
 
-
-		sprite_renderer_push_text("hello", 15.0f);
-
+		sprite_renderer_push_text(frame_count_text, 0, 0, 5);
+		sprite_renderer_push_text(frame_count_text, 0, 20, 5);
+		//sprite_renderer_push_text("hello eh 1234", 16.0f);
 	}
 	sprite_renderer_render_end();
 }
