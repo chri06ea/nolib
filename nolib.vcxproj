@@ -145,7 +145,6 @@
     <None Include="assets\sprite.vert" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="main.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>

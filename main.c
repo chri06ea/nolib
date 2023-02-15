@@ -8,7 +8,6 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include "main.h"
 
 #define OPENGL
 #pragma comment(lib, "opengl32.lib")
@@ -16,8 +15,8 @@
 //////////////////////////////////////////////////////////////////////
 // Default values
 
-#define DEFAULT_WINDOW_WIDTH  800
-#define DEFAULT_WINDOW_HEIGHT 600
+#define DEFAULT_WINDOW_WIDTH  1024
+#define DEFAULT_WINDOW_HEIGHT 768
 
 //////////////////////////////////////////////////////////////////////
 // Core types
@@ -61,6 +60,19 @@ typedef struct {
 	f32 r, g, b, a;
 } c4f;
 
+const c4f C4F_WHITE = {
+	1.f, 1.f, 1.f, 1.f
+};
+const c4f C4F_RED = {
+	1.f, 0.f, 0.f, 1.f
+};
+const c4f C4F_GREEN = {
+	0.f, 1.f, 0.f, 1.f
+};
+const c4f C4F_BLUE = {
+	0.f, 0.f, 1.f, 1.f
+};
+
 typedef struct {
 	f32 x, y, z, w;
 } v4f;
@@ -100,7 +112,7 @@ inline v2f add_v2f_v2f(const v2f* v, const v2f* v2)
 
 void* alloc_buffer(u32 size)
 {
-	void* allocated = malloc(size * 2);
+	void* allocated = malloc(size);
 	return allocated;
 }
 
@@ -131,6 +143,15 @@ ch8* str_concat(ch8* s1, ch8* s2)
 	strcpy_s(result, buf_len, s1);
 	strcat_s(result, buf_len, result);
 	return result;
+}
+
+u32 str_length(ch8* s)
+{
+	u32 length = 0;
+
+	while(s[length] != '\0') length++;
+
+	return length;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -822,8 +843,6 @@ typedef struct {
 
 } AtlasSpriteRenderData;
 
-#pragma pack(pop)
-
 Resource g_sprite_render_atlas_vertex_shader_resource;
 Resource g_sprite_render_atlas_fragment_shader_resource;
 
@@ -968,6 +987,8 @@ void sprite_renderer_init_atlas_texture()
 
 	memset(atlas_data, 0, atlas_size * 4);
 
+	g_sprite_renderer_atlas_sprite_info_count = 0;
+
 	int x = 0, y = 0;
 	for(u32 sprite_index = 0; sprite_index < g_sprite_renderer_texture_resources_count; sprite_index++)
 	{
@@ -1026,19 +1047,6 @@ void sprite_renderer_init_atlas_texture()
 	free(atlas_data);
 }
 
-void sprite_renderer_init()
-{
-	sprite_renderer_init_atlas_index_buffer();
-
-	sprite_renderer_init_atlas_storage_buffer();
-
-	sprite_renderer_init_atlas_shader();
-
-	sprite_renderer_use_atlas_shader();
-
-	sprite_renderer_init_atlas_texture();
-}
-
 void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen, const c4f* color)
 {
 	const AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
@@ -1067,6 +1075,45 @@ void sprite_renderer_render_end()
 	gl_fail_if_false(glDrawElements(GL_TRIANGLES, g_sprite_renderer_render_buffer_count * 6, GL_UNSIGNED_INT, 0));
 
 	fail_if_false(SwapBuffers(g_device_context));
+}
+
+void sprite_renderer_push_text(const char* text, float scale)
+{
+	u32 text_length = str_length(text);
+
+	u32 x_offset = 0, y_offset = 0;
+
+	for(size_t character_index = 0; character_index < text_length; character_index++)
+	{
+		ch8 texture_name[MAX_PATH];
+		sprintf_s(texture_name, sizeof(texture_name), "c_%c.png", text[character_index]);
+
+		for(size_t sprite_index = 0; sprite_index < g_sprite_renderer_atlas_sprite_info_count; sprite_index++)
+		{
+			AtlasSpriteInfo* sprite_info = &g_sprite_renderer_atlas_sprite_info[sprite_index];
+
+			if(strstr(sprite_info->name, texture_name))
+			{
+				sprite_renderer_push_sprite(texture_name, x_offset, 0, scale / 3, false, &C4F_WHITE);
+
+				x_offset += sprite_info->sprite_width + 1;
+			}
+		}
+	}
+
+}
+
+void sprite_renderer_init()
+{
+	sprite_renderer_init_atlas_index_buffer();
+
+	sprite_renderer_init_atlas_storage_buffer();
+
+	sprite_renderer_init_atlas_shader();
+
+	sprite_renderer_use_atlas_shader();
+
+	sprite_renderer_init_atlas_texture();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1127,6 +1174,38 @@ void hot_reload()
 }
 
 //////////////////////////////////////////////////////////////////////
+// Game
+
+typedef struct {
+	v2f position;
+} GameObject;
+
+GameObject game_objects[10];
+u32 game_objects_count = 0;
+
+void game_init()
+{
+	GameObject* game_object = &game_objects[game_objects_count++];
+}
+
+void game_render()
+{
+	sprite_renderer_render_begin();
+
+	for(size_t i = 0; i < game_objects_count; i++)
+	{
+		GameObject* game_object = &game_objects[i];
+
+		sprite_renderer_push_sprite("radio.png", DEFAULT_WINDOW_WIDTH - 48, 0, 1.0, false, &C4F_WHITE);
+
+
+		sprite_renderer_push_text("hello", 15.0f);
+
+	}
+	sprite_renderer_render_end();
+}
+
+//////////////////////////////////////////////////////////////////////
 // Main
 
 int main(int argc, const char** argv)
@@ -1141,6 +1220,8 @@ int main(int argc, const char** argv)
 
 	sprite_renderer_init();
 
+	game_init();
+
 	while(true)
 	{
 		#ifdef _DEBUG
@@ -1149,66 +1230,7 @@ int main(int argc, const char** argv)
 
 		window_process_messages();
 
-		{
-			sprite_renderer_render_begin();
-			const c4f C4F_WHITE = {
-				1.f, 1.f, 1.f, 1.f
-			};
-			const c4f C4F_RED = {
-				1.f, 0.f, 0.f, 1.f
-			};
-			const c4f C4F_GREEN = {
-				0.f, 1.f, 0.f, 1.f
-			};
-			const c4f C4F_BLUE = {
-				0.f, 0.f, 1.f, 1.f
-			};
-
-			sprite_renderer_push_sprite("room2.png", 0, 0, 1, true, &C4F_GREEN);
-			sprite_renderer_push_sprite("ui.png", 0, 0, 1, true, &C4F_GREEN);
-			sprite_renderer_push_sprite("test.png", 300, 300, 3, false, &C4F_GREEN);
-
-
-			f32 xpos = 0.f;
-			for(size_t i = 0; i < 10; i++)
-			{
-				if(g_cursor_x >= xpos && g_cursor_x < xpos + 48.f)
-				{
-					if(g_input_key_states['A'])
-					{
-						sprite_renderer_push_sprite("radio.png", xpos, 0, 1.0, false, &C4F_RED);
-					}
-					else
-					{
-						sprite_renderer_push_sprite("radio.png", xpos, 0, 2.0, false, &C4F_WHITE);
-					}
-
-				}
-				else
-				{
-					sprite_renderer_push_sprite("radio.png", xpos, 0, 1.0, false, &C4F_GREEN);
-
-				}
-				xpos += 48.f;
-			}
-
-			sprite_renderer_push_sprite("seedling.png", 100, 100, 1.5, false, &C4F_GREEN);
-
-			sprite_renderer_push_sprite("pot_simple.png", window_width / 2.f, window_height / 2.f, 2, false, &C4F_GREEN);
-
-			if(g_input_key_states['A'])
-			{
-				sprite_renderer_push_sprite("cola.png", 470, 330, 1, false, &C4F_GREEN);
-			}
-			else
-			{
-				sprite_renderer_push_sprite("cola.png", 470, 330, 1, false, &C4F_BLUE);
-
-			}
-			sprite_renderer_push_sprite("cursor.png", g_cursor_x, g_cursor_y, 1, false, &C4F_GREEN);
-
-			sprite_renderer_render_end();
-		}
+		game_render();
 
 		Sleep(1);
 	}
