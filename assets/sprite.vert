@@ -3,6 +3,8 @@
 out vec2 _uv;
 out vec4 _color;
 
+uniform ivec2 u_screen_size = ivec2(1000, 750);
+
 struct Sprite
 {
 	vec2 screen_pos;
@@ -59,13 +61,13 @@ void main()
 	}
 	else
 	{
-		float xf =  (2.0 / 1024.0) * s.scale;
-		float yf =  (2.0 / 768.0) * s.scale;
+		float xf =  (2.0 / u_screen_size.x);
+		float yf =  (2.0 / u_screen_size.y);
 
 		float px0 = -1.0 + (xf * s.screen_pos.x);
 		float py0 = +1.0 - (yf * s.screen_pos.y);
-		float px1 = -1.0 + (xf * (s.screen_pos.x + s.sprite_size.x));
-		float py1 = +1.0 - (yf * (s.screen_pos.y + s.sprite_size.y));
+		float px1 = -1.0 + (xf * (s.screen_pos.x + (s.screen_size.x * s.scale)));
+		float py1 = +1.0 - (yf * (s.screen_pos.y + (s.screen_size.y * s.scale)));
 
 		vec2 vertices[4] = 
 		{

@@ -540,6 +540,16 @@ u8(__stdcall* glUnmapBuffer)(u32 target);
 u8(__stdcall* glEnable)(u32 a1);
 u8(__stdcall* glDisable)(u32 a1);
 u8(__stdcall* glBlendFunc)(u32 a1, u32 a2);
+i32(__stdcall* glGetUniformLocation)(u32 a1, ch8* name);
+void(__stdcall* glUniform1f)(i32 location, f32 v0);
+void(__stdcall* glUniform2f)(i32 location, f32 v0, f32 v1);
+void(__stdcall* glUniform3f)(i32 location, f32 v0, f32 v1, f32 v2);
+void(__stdcall* glUniform4f)(i32 location, f32 v0, f32 v1, f32 v2, f32 v3);
+void(__stdcall* glUniform1i)(i32 location, i32 v0);
+void(__stdcall* glUniform2i)(i32 location, i32 v0, i32 v1);
+void(__stdcall* glUniform3i)(i32 location, i32 v0, i32 v1, i32 v2);
+void(__stdcall* glUniform4i)(i32 location, i32 v0, i32 v1, i32 v2, i32 v3);
+
 
 int _t_gl_error = 0;
 #define gl_fail_if_false(x) x; if((_t_gl_error = glGetError()) != 0) { printf("gl_assert: %d\n", _t_gl_error); __debugbreak(); }
@@ -593,6 +603,15 @@ void opengl_init_pointers()
 	fail_if_false(glEnable = wgl_get_proc_address(opengl_module_handle, "glEnable"));
 	fail_if_false(glDisable = wgl_get_proc_address(opengl_module_handle, "glDisable"));
 	fail_if_false(glBlendFunc = wgl_get_proc_address(opengl_module_handle, "glBlendFunc"));
+	fail_if_false(glGetUniformLocation = wgl_get_proc_address(opengl_module_handle, "glGetUniformLocation"));
+	fail_if_false(glUniform1f = wgl_get_proc_address(opengl_module_handle, "glUniform1f"));
+	fail_if_false(glUniform2f = wgl_get_proc_address(opengl_module_handle, "glUniform2f"));
+	fail_if_false(glUniform3f = wgl_get_proc_address(opengl_module_handle, "glUniform3f"));
+	fail_if_false(glUniform4f = wgl_get_proc_address(opengl_module_handle, "glUniform4f"));
+	fail_if_false(glUniform1i = wgl_get_proc_address(opengl_module_handle, "glUniform1i"));
+	fail_if_false(glUniform2i = wgl_get_proc_address(opengl_module_handle, "glUniform2i"));
+	fail_if_false(glUniform3i = wgl_get_proc_address(opengl_module_handle, "glUniform3i"));
+	fail_if_false(glUniform4i = wgl_get_proc_address(opengl_module_handle, "glUniform4i"));
 }
 
 u32 opengl_compile_shader(const ch8* shader_source, const ch8* shader_type)
@@ -691,7 +710,7 @@ u8 g_input_key_states[0xFF];
 HWND g_window_handle;
 HDC g_device_context;
 HGLRC g_rendering_context;
-u32 window_width = DEFAULT_WINDOW_WIDTH, window_height = DEFAULT_WINDOW_HEIGHT;
+u32 g_window_width = DEFAULT_WINDOW_WIDTH, g_window_height = DEFAULT_WINDOW_HEIGHT;
 u32 g_cursor_x = 0, g_cursor_y = 0;
 
 LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -704,6 +723,16 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 		{
 			break;
 		};
+		case WM_LBUTTONDOWN:
+		{
+			g_input_key_states[VK_LBUTTON] = 1;
+		}
+		break;
+		case WM_LBUTTONUP:
+		{
+			g_input_key_states[VK_LBUTTON] = 0;
+		}
+		break;
 		case WM_KEYDOWN:
 		{
 			g_input_key_states[wparam] = 1;
@@ -718,11 +747,11 @@ LRESULT CALLBACK window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam
 		{
 			RECT client_rect;
 			fail_if_false(GetClientRect(window, &client_rect));
-			window_width = (client_rect.right - client_rect.left);
-			window_height = (client_rect.bottom - client_rect.top);
+			g_window_width = (client_rect.right - client_rect.left);
+			g_window_height = (client_rect.bottom - client_rect.top);
 			if(glViewport)
 			{
-				glViewport(0, 0, window_width, window_height);
+				glViewport(0, 0, g_window_width, g_window_height);
 			}
 			break;
 		}
@@ -1063,6 +1092,12 @@ void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale
 
 void sprite_renderer_render_begin()
 {
+	i32 u_screen_size;
+	
+	gl_fail_if_false(u_screen_size = glGetUniformLocation(g_sprite_renderer_atlas_shader_handle, "u_screen_size"));
+
+	gl_fail_if_false(glUniform2i(u_screen_size, g_window_width, g_window_height));
+
 	g_sprite_renderer_render_buffer_count = 0;
 
 	gl_fail_if_false(glClearColor(1, 0, 0, 1));
@@ -1106,7 +1141,7 @@ void sprite_renderer_push_text(const char* text, u32 x, u32 y, f32 scale)
 			{
 				sprite_renderer_push_sprite(texture_name, x + x_offset, y + y_offset, scale, false, &C4F_WHITE);
 
-				x_offset += sprite_info->sprite_width + 1;
+				x_offset += sprite_info->sprite_width * scale + 1;
 
 				break;
 			}
@@ -1203,16 +1238,44 @@ void game_render()
 {
 	sprite_renderer_render_begin();
 
+	#ifdef _DEBUG
+	ch8 frame_count_text[128];
+	sprintf_s(frame_count_text, sizeof(frame_count_text), "render count %d", g_sprite_renderer_render_count);
+	sprite_renderer_push_text(frame_count_text, 0, 0, 3);
+
+	ch8 cursor_pos_text[128];
+	sprintf_s(cursor_pos_text, sizeof(cursor_pos_text), "cursorpos x: %d y: %d", g_cursor_x, g_cursor_y);
+	sprite_renderer_push_text(cursor_pos_text, 0, 20, 3);
+
+	ch8 mouse_state_text[128];
+	sprintf_s(mouse_state_text, sizeof(mouse_state_text), "cursor state %d", g_input_key_states[VK_LBUTTON]);
+	sprite_renderer_push_text(mouse_state_text, 0, 40, 3);
+
+	ch8 window_size_text[128];
+	sprintf_s(window_size_text, sizeof(window_size_text), "window width: %d, height: %d", g_window_width, g_window_height);
+	sprite_renderer_push_text(window_size_text, 0, 60, 3);
+
+	#endif
+
+
 	for(size_t i = 0; i < game_objects_count; i++)
 	{
 		GameObject* game_object = &game_objects[i];
 
-		ch8 frame_count_text[128];
-		sprintf_s(frame_count_text, sizeof(frame_count_text), "render count %d", g_sprite_renderer_render_count);
 
-		sprite_renderer_push_text(frame_count_text, 0, 0, 5);
-		sprite_renderer_push_text(frame_count_text, 0, 20, 5);
-		//sprite_renderer_push_text("hello eh 1234", 16.0f);
+		if(
+			g_cursor_x >= 200 && g_cursor_x <= 300 &&
+			g_cursor_y >= 200 && g_cursor_y <= 300
+			)
+		{
+			sprite_renderer_push_text("click me", 200, 200, 10);
+		}
+		else
+		{
+
+			sprite_renderer_push_text("hey 1", 200, 200, 10);
+		}
+
 	}
 	sprite_renderer_render_end();
 }
