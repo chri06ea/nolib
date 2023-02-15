@@ -1078,7 +1078,7 @@ void sprite_renderer_init_atlas_texture()
 	free(atlas_data);
 }
 
-void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen, const c4f* color)
+AtlasSpriteInfo* sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen, const c4f* color)
 {
 	const AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
 	AtlasSpriteRenderData* sprite = sprite_renderer_render_new_sprite(sprite_info);
@@ -1088,12 +1088,14 @@ void sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale
 	sprite->scale = scale;
 	sprite->full_screen = full_screen;
 	sprite->color = *color;
+
+	return sprite;
 }
 
 void sprite_renderer_render_begin()
 {
 	i32 u_screen_size;
-	
+
 	gl_fail_if_false(u_screen_size = glGetUniformLocation(g_sprite_renderer_atlas_shader_handle, "u_screen_size"));
 
 	gl_fail_if_false(glUniform2i(u_screen_size, g_window_width, g_window_height));
@@ -1141,7 +1143,7 @@ void sprite_renderer_push_text(const char* text, u32 x, u32 y, f32 scale)
 			{
 				sprite_renderer_push_sprite(texture_name, x + x_offset, y + y_offset, scale, false, &C4F_WHITE);
 
-				x_offset += sprite_info->sprite_width * scale + 1;
+				x_offset += sprite_info->sprite_width * scale + 1 * scale;
 
 				break;
 			}
@@ -1252,7 +1254,7 @@ void game_render()
 	sprite_renderer_push_text(mouse_state_text, 0, 40, 3);
 
 	ch8 window_size_text[128];
-	sprintf_s(window_size_text, sizeof(window_size_text), "window width: %d, height: %d", g_window_width, g_window_height);
+	sprintf_s(window_size_text, sizeof(window_size_text), "window width:  %d,  height:  %d", g_window_width, g_window_height);
 	sprite_renderer_push_text(window_size_text, 0, 60, 3);
 
 	#endif
@@ -1263,19 +1265,19 @@ void game_render()
 		GameObject* game_object = &game_objects[i];
 
 
+		const AtlasSpriteInfo* radio_sprite_info = sprite_renderer_get_sprite_info_by_name("radio.png");
+
 		if(
-			g_cursor_x >= 200 && g_cursor_x <= 300 &&
-			g_cursor_y >= 200 && g_cursor_y <= 300
+			g_cursor_x >= 200 && g_cursor_x <= 200 + radio_sprite_info->sprite_width * 5 &&
+			g_cursor_y >= 200 && g_cursor_y <= 200 + radio_sprite_info->sprite_height * 5
 			)
 		{
-			sprite_renderer_push_text("click me", 200, 200, 10);
+			sprite_renderer_push_sprite("radio.png", 200, 200, 5, false, &C4F_GREEN);
 		}
 		else
 		{
-
-			sprite_renderer_push_text("hey 1", 200, 200, 10);
+			sprite_renderer_push_sprite("radio.png", 200, 200, 5, false, &C4F_WHITE);
 		}
-
 	}
 	sprite_renderer_render_end();
 }
