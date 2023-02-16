@@ -1078,7 +1078,7 @@ void sprite_renderer_init_atlas_texture()
 	free(atlas_data);
 }
 
-AtlasSpriteInfo* sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen, const c4f* color)
+AtlasSpriteRenderData* sprite_renderer_push_sprite(const ch8* sprite_name, i32 x, i32 y, f32 scale, bool full_screen, const c4f* color)
 {
 	const AtlasSpriteInfo* sprite_info = sprite_renderer_get_sprite_info_by_name(sprite_name);
 	AtlasSpriteRenderData* sprite = sprite_renderer_render_new_sprite(sprite_info);
@@ -1226,15 +1226,46 @@ void hot_reload()
 
 typedef struct {
 	v2f position;
+	f32 radius;
 } GameObject;
 
 GameObject game_objects[10];
 u32 game_objects_count = 0;
 
+bool game_cursor_on_game_object(GameObject* game_object)
+{
+	return
+		g_cursor_x >= game_object->position.x &&
+		g_cursor_x <= game_object->position.x + game_object->radius &&
+		g_cursor_y >= game_object->position.y &&
+		g_cursor_y <= game_object->position.y + game_object->radius;
+}
+
+void game_draw_game_object(GameObject* game_object)
+{
+	const AtlasSpriteInfo* radio_sprite_info = sprite_renderer_get_sprite_info_by_name("radio.png");
+	f32 scale = 1.f;
+	const c4f* color = &C4F_BLUE;
+
+	if(game_cursor_on_game_object(game_object))
+		color = &C4F_WHITE;
+
+	AtlasSpriteRenderData* sprite_render_data = sprite_renderer_push_sprite(
+		"radio.png", game_object->position.x, game_object->position.y, scale, false, color);
+
+	sprite_render_data->screen_size.w = game_object->radius;
+	sprite_render_data->screen_size.h = game_object->radius;
+}
+
 void game_init()
 {
 	GameObject* game_object = &game_objects[game_objects_count++];
+	game_object->position.x = 100;
+	game_object->position.y = 100;
+	game_object->radius = 48;
 }
+
+bool g_is_dragging = false;
 
 void game_render()
 {
@@ -1264,21 +1295,9 @@ void game_render()
 	{
 		GameObject* game_object = &game_objects[i];
 
-
-		const AtlasSpriteInfo* radio_sprite_info = sprite_renderer_get_sprite_info_by_name("radio.png");
-
-		if(
-			g_cursor_x >= 200 && g_cursor_x <= 200 + radio_sprite_info->sprite_width * 5 &&
-			g_cursor_y >= 200 && g_cursor_y <= 200 + radio_sprite_info->sprite_height * 5
-			)
-		{
-			sprite_renderer_push_sprite("radio.png", 200, 200, 5, false, &C4F_GREEN);
-		}
-		else
-		{
-			sprite_renderer_push_sprite("radio.png", 200, 200, 5, false, &C4F_WHITE);
-		}
+		game_draw_game_object(game_object);
 	}
+
 	sprite_renderer_render_end();
 }
 
@@ -1306,6 +1325,25 @@ int main(int argc, const char** argv)
 		#endif
 
 		window_process_messages();
+
+		if(g_input_key_states[VK_LBUTTON])
+		{
+			if(game_cursor_on_game_object(&game_objects[0]))
+			{
+				g_is_dragging = true;
+
+			}
+		}
+		else
+		{
+				g_is_dragging = false;
+		}
+
+		if(g_is_dragging)
+		{
+			game_objects[0].position.x = g_cursor_x - 5;
+			game_objects[0].position.y = g_cursor_y - 5;
+		}
 
 		game_render();
 
